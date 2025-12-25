@@ -9,7 +9,7 @@
 
 - name: Generate SSH ED25519 Key Pairs
   community.crypto.openssh_keypair:
-    path: "{{ local_keys_dir }}/{{ item.username }}_id_ed25519"
+    path: "{{ ssh_keys_dir }}/{{ item.username }}_id_ed25519"
     type: ed25519
     comment: "{{ item.username }}@{{ inventory_hostname }}"
     state: present
