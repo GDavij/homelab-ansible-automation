@@ -1,0 +1,47 @@
+- name: Define Underlay Zone
+  ansible.posix.firewalld:
+    zone: underlay_network
+    state: present
+    permanent: true
+  become: true
+  notify:
+    - Reload_firewalld
+  tags:
+    - network_gateways
+
+- name: Flush Handlers to register Zone now
+  ansible.builtin.meta: flush_handlers
+
+- name: Bind Default Physical Network Interface into Underlay Zone(Security Group)
+  ansible.posix.firewalld:
+    zone: underlay_network
+    interface: "{{ ansible_default_ipv4.interface }}"
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  tags:
+    - network_gateways
+
+- name: Enable Masquerinding (NAT Gateway)
+  ansible.posix.firewalld:
+    zone: underlay_network
+    masquerade: true
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  tags:
+    - network_gateways
+
+- name: Define IGRESS Policies
+  ansible.builtin.include_tasks:
+    file: firewall-igress-policies.yml
+  tags:
+    - network_gateways
+
+- name: Define EGRESS Policies
+  ansible.builtin.include_tasks:
+    file: firewall-egress-policies.yml
+  tags:
+    - network_gateways

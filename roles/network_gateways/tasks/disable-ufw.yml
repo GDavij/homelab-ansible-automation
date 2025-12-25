@@ -1,0 +1,19 @@
+- name: Disable and Stop UFW
+  ansible.builtin.systemd:
+    name: ufw
+    state: stopped
+    enabled: false
+  become: true
+  register: network_gateways_ufw_stop_result
+  ignore_errors: true
+  tags:
+    - network_gateways
+
+- name: Purge UFW if exists
+  ansible.builtin.package:
+    name: ufw
+    state: absent
+    purge: true
+  become: true
+  tags:
+    - network_gateways

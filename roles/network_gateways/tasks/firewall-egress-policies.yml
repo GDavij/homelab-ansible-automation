@@ -1,0 +1,16 @@
+- name: Setup Egress Rules using Direct.xml
+  ansible.builtin.copy:
+    src: direct.xml
+    dest: /etc/firewalld/direct.xml
+    owner: root
+    group: root
+    mode: '0640'
+  become: true
+  notify: Reload_firewalld
+  tags:
+    - network_gateways
+
+- name: "Flush Handlers to Apply Egress Rules Immediately"
+  ansible.builtin.meta: flush_handlers
+  tags:
+    - network_gateways

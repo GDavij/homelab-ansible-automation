@@ -1,0 +1,56 @@
+- name: Force Update Apt Cache (Debian)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+  become: true
+  tags:
+    - common
+    - essential
+
+- name: Force Update Dnf Cache (RHEL)
+  ansible.builtin.dnf:
+    update_cache: true
+  when: ansible_os_family == "RedHat"
+  become: true
+  tags:
+    - common
+    - essential
+
+- name: Setup Base Packages Naming
+  ansible.builtin.set_fact:
+    common_packages:
+      - vim
+      - git
+      - nano
+      - curl
+      - wget
+      - unzip
+      - tar
+      - htop
+      - net-tools
+      - ca-certificates
+      - gnupg
+      - openssl
+      - kitty-terminfo
+
+    common_os_specific_packages: >-
+      {{
+        ['iputils-ping', 'dnsutils', 'procps']
+        if ansible_os_family == 'Debian'
+        else
+        ['iputils', 'bind-utils', 'procps-ng']
+      }}
+  become: true
+  tags:
+    - common
+    - essential
+
+- name: Install Essential Base Packages
+  ansible.builtin.package:
+    name: "{{ common_packages + common_os_specific_packages }}"
+    state: present
+  become: true
+  tags:
+    - common
+    - essential

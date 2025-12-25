@@ -1,0 +1,58 @@
+- name: Assert that Distribution is Debian-based
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution in ['Ubuntu', 'Debian']
+    fail_msg: >
+      This role is only supported on Debian-based distributions.
+      This appears to be a Gateway system running {{ ansible_distribution }}.
+      CasaOS requires Ubuntu or Debian-based distributions.
+  tags:
+    - casaos
+
+- name: Check CasaOs Binary Status
+  ansible.builtin.stat:
+    path: /usr/bin/casaos
+  become: true
+  register: casaos_bin_check
+  tags:
+    - casaos
+
+- name: Get Updates from APT
+  ansible.builtin.apt:
+    update_cache: true
+  become: true
+  when:
+    - not casaos_bin_check.stat.exists
+  tags:
+    - casaos
+
+- name: Download CasaOs Binary if not present
+  ansible.builtin.get_url:
+    url: https://get.casaos.io
+    dest: /tmp/casaos-install.sh
+    mode: '0755'
+  become: true
+  when:
+    - not casaos_bin_check.stat.exists
+  tags:
+    - casaos
+
+- name: Setup CasaOS using Installation Script
+  ansible.builtin.command:
+    cmd: bash /tmp/casaos-install.sh
+    creates: /usr/bin/casaos
+  become: true
+  when:
+    - not casaos_bin_check.stat.exists
+  tags:
+    - casaos
+
+- name: Remove installation script
+  ansible.builtin.file:
+    path: /tmp/casaos-install.sh
+    state: absent
+  become: true
+  when:
+    - not casaos_bin_check.stat.exists
+  tags:
+    - casaos

@@ -1,0 +1,31 @@
+# --- Ansible ---
+*.retry
+*.log
+*.swp
+*.swo
+inventory.ini.bkp
+.ansible/
+
+# --- Dependências (Galaxy) ---
+collections/
+vendor_roles/
+
+# --- Segredos & Chaves (CRÍTICO) ---
+# Ignora qualquer chave privada ou certificado que você gere localmente
+*.key
+*.pem
+*.csr
+*.crt
+*.p12
+.env
+
+# --- SSH & Configs Pessoais ---
+# Se você tiver configs SSH locais na pasta
+ssh_config
+id_rsa
+id_ed25519
+
+# --- Arquivos de Sistema/Editor ---
+.DS_Store
+.vscode/
+.idea/

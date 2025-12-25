@@ -1,0 +1,39 @@
+- name: Setup default ssh folders
+  ansible.builtin.file:
+    path: "{{ ssh_keys_dir }}"
+    state: directory
+    mode: '0700'
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Generate SSH ED25519 Key Pairs
+  community.crypto.openssh_keypair:
+    path: "{{ local_keys_dir }}/{{ item.username }}_id_ed25519"
+    type: ed25519
+    comment: "{{ item.username }}@{{ inventory_hostname }}"
+    state: present
+    mode: "0600"
+    force: false
+  delegate_to: localhost
+  become: false
+  loop: "{{ system_users }}"
+
+- name: Manage User Groups
+  ansible.builtin.group:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ system_groups }}"
+
+- name: Manage Users
+  ansible.builtin.user:
+    name: "{{ item.username }}"
+    groups: "{{ item.groups }}"
+    shell: "{{ item.shell | default('/bin/bash') }}"
+    append: true
+    state: "{{ item.state }}"
+    create_home: true
+    password_lock: true
+  loop: "{{ system_users }}"
+  loop_control:
+    label: "{{ item.username }}"

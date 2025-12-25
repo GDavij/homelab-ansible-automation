@@ -1,0 +1,11 @@
+- name: Homelab Automation Playbook
+  hosts: all
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Install CasaOS for Gateways
+      ansible.builtin.import_role:
+        name: casaos
+      tags:
+        - gateway
+        - casaos

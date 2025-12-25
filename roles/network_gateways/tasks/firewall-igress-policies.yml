@@ -1,0 +1,54 @@
+- name: Allow SSH for Inbound Traffic on Underlay Network
+  ansible.posix.firewalld:
+    zone: underlay_network
+    service: ssh
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  tags:
+    - network_gateways
+
+- name: Allow DNS Inbound Traffic on comming from the Router IP
+  ansible.posix.firewalld:
+    zone: underlay_network
+    rich_rule: 'rule family="ipv4" source address="{{ router_ip_address }}" service name="dns" accept'
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  tags:
+    - network_gateways
+
+- name: Allow HTTP Inbound Traffic on Underlay Network
+  ansible.posix.firewalld:
+    zone: underlay_network
+    service: http
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  tags:
+    - network_gateways
+
+- name: Allow HTTPs Inbound Traffic on Underlay Network
+  ansible.posix.firewalld:
+    zone: underlay_network
+    service: https
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  tags:
+    - network_gateways
+
+- name: Allow ICMP Inbound Traffic on Underlay Network
+  ansible.posix.firewalld:
+    zone: underlay_network
+    rich_rule: 'rule protocol value="icmp" icmp-type name="echo-request" accept'
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  tags:
+    - network_gateways

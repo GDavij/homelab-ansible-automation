@@ -1,0 +1,15 @@
+- name: Setup Culture
+  ansible.builtin.include_tasks:
+    file: setup_culture.yml
+  tags:
+    - common
+    - timezone
+    - locale
+    - culture
+
+- name: Setup Packages
+  ansible.builtin.include_tasks:
+    file: setup_packages.yml
+  tags:
+    - common
+    - packages
