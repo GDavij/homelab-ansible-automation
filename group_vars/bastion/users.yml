@@ -10,7 +10,7 @@ system_users:
     state: present
 
 system_groups:
-    - "sudo"
-    - "docker"
+  - "sudo"
+  - "docker"
 
 ssh_keys_dir: "{{ playbook_dir }}/.ssh_keys/bastion"
