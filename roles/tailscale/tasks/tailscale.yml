@@ -1,0 +1,49 @@
+- name: Check if Tailscale already Installed
+  ansible.builtin.stat:
+    path: /usr/bin/tailscale
+  register: tailscale_installed
+
+- name: Install Tailscale (Download Script and Install Script)
+  when: not tailscale_installed.stat.exists
+  block:
+    - name: Download Tailscale Install Script
+      ansible.builtin.get_url:
+        url: https://tailscale.com/install.sh
+        dest: /tmp/tailscale-install.sh
+        mode: '0700'
+
+    - name: Execute Tailscale Install Script
+      ansible.builtin.command:
+        cmd: /tmp/tailscale-install.sh
+      become: true
+      changed_when: true
+
+- name: Enable and Authorize Tailscale
+  block:
+    - name: Ensure that Variable 'TAILSCALE_AUTH_KEY' in Set on Environment
+      ansible.builtin.assert:
+        that:
+          - lookup('env', 'TAILSCALE_AUTH_KEY') | length > 0
+        fail_msg: "Variable 'TAILSCALE_AUTH_KEY' is not set in Environment"
+        success_msg: "Variable 'TAILSCALE_AUTH_KEY' is set in Environment"
+
+    - name: Check Tailscale Status
+      ansible.builtin.command:
+        cmd: tailscale status
+      register: tailscale_status
+      changed_when: false
+      failed_when: false
+
+    - name: Connect to Tailscale (Enable Subnet Routing, Disables Accept DNS(DNS LOOP))
+      ansible.builtin.command:
+        cmd: >
+          tailscale up
+            --auth-key={{ lookup('env', 'TAILSCALE_AUTH_KEY') }}
+            --hostname={{ inventory_hostname }}
+            --advertise-routes={{ subnet_cidr }}
+            --advertise-exit-node
+            --accept-routes
+            --accept-dns=false
+      become: true
+      changed_when: true
+      when: tailscale_status.rc != 0

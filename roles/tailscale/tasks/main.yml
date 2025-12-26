@@ -1,0 +1,19 @@
+- name: Enable Os Level Package Fowarding
+  ansible.builtin.include_tasks:
+    file: package-forwarding.yml
+  tags:
+    - tailscale
+    - package-forwarding
+
+- name: Install Tailscale
+  ansible.builtin.include_tasks:
+    file: tailscale.yml
+  tags:
+    - tailscale
+
+- name: Setup Firewalld for Tailscale ZTN Zone
+  ansible.builtin.include_tasks:
+    file: firewalld.yml
+  tags:
+    - tailscale
+    - firewalld

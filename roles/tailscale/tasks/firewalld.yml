@@ -1,0 +1,59 @@
+- name: Refresh Network Facts (catch tailscale0 interface)
+  ansible.builtin.setup:
+    gather_subset: network
+  become: true
+  tags:
+    - tailscale
+
+- name: Create Zero Trust Firewall Zone
+  ansible.posix.firewalld:
+    zone: ztn_network
+    state: present
+    permanent: true
+  become: true
+  notify: Reload_firewalld
+  tags:
+    - tailscale
+
+- name: Flush Handlers to Register ZTN zone
+  ansible.builtin.meta: flush_handlers
+  tags:
+    - tailscale
+
+- name: Bind Tailscale0 Interface into ZTN Zone
+  ansible.posix.firewalld:
+    zone: ztn_network
+    interface: tailscale0
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  when: "'tailscale0' in ansible_interfaces"
+  tags:
+    - tailscale
+
+- name: Enable Masquerede on ZTN Zone
+  ansible.posix.firewalld:
+    zone: ztn_network
+    masquerade: true
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  tags:
+    - tailscale
+
+- name: Allow SSH in ZTN Zone
+  ansible.posix.firewalld:
+    zone: ztn_network
+    service: "{{ item }}"
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  loop:
+    - ssh
+    - http
+    - https
+  tags:
+    - tailscale
