@@ -1,6 +1,6 @@
 default_timezone: "America/Sao_Paulo"
 
-default_locales: 
+default_locales:
   - "en-US"
   - "pt-BR"
 

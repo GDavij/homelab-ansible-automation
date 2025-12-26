@@ -1,0 +1,21 @@
+- name: Trust Docker Interface (If exists)
+  ansible.posix.firewalld:
+    zone: trusted
+    interface: docker0
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  when: "'docker0' in ansible_interfaces"
+  tags: network_gateways
+
+- name: Trust Tailscale Interface (If exists)
+  ansible.posix.firewalld:
+    zone: trusted
+    interface: tailscale0
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  when: "'tailscale0' in ansible_interfaces"
+  tags: network_gateways
