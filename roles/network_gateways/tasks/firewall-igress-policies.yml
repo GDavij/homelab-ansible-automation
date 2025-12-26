@@ -12,7 +12,7 @@
 - name: Allow DNS Inbound Traffic on comming from the Router IP
   ansible.posix.firewalld:
     zone: underlay_network
-    rich_rule: 'rule family="ipv4" source address="{{ router_ip_address }}" service name="dns" accept'
+    rich_rule: 'rule family="ipv4" source address="{{ subnet_cidr }}" service name="dns" accept'
     state: enabled
     permanent: true
     immediate: true

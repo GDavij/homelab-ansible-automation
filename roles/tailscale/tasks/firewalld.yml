@@ -4,6 +4,7 @@
   become: true
   tags:
     - tailscale
+    - firewalld
 
 - name: Create Zero Trust Firewall Zone
   ansible.posix.firewalld:
@@ -14,11 +15,13 @@
   notify: Reload_firewalld
   tags:
     - tailscale
+    - firewalld
 
 - name: Flush Handlers to Register ZTN zone
   ansible.builtin.meta: flush_handlers
   tags:
     - tailscale
+    - firewalld
 
 - name: Bind Tailscale0 Interface into ZTN Zone
   ansible.posix.firewalld:
@@ -31,6 +34,7 @@
   when: "'tailscale0' in ansible_interfaces"
   tags:
     - tailscale
+    - firewalld
 
 - name: Enable Masquerede on ZTN Zone
   ansible.posix.firewalld:
@@ -42,6 +46,7 @@
   become: true
   tags:
     - tailscale
+    - firewalld
 
 - name: Allow SSH in ZTN Zone
   ansible.posix.firewalld:
@@ -57,3 +62,16 @@
     - https
   tags:
     - tailscale
+    - firewalld
+
+- name: Allow DNS Inbound Traffic on comming from the Tailnet IP
+  ansible.posix.firewalld:
+    zone: ztn_network
+    rich_rule: 'rule family="ipv4" source address="100.64.0.0/10" service name="dns" accept'
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  tags:
+    - tailscale
+    - firewalld
