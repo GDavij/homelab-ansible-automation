@@ -1,0 +1,53 @@
+- name: Verify if Certificate already exists for {{ service.name }}
+  ansible.builtin.stat:
+    path: "{{ pki_output_folder }}/{{ service.name }}.crt"
+  register: pki_cert_exists
+  delegate_to: localhost
+  tags:
+    - pki
+    - service-cert
+
+- name: Generate Certificate for {{ service.name }}
+  when: not pki_cert_exists.stat.exists
+  block:
+    - name: Generate Private Key for {{ service.name }}
+      community.crypto.openssl_privatekey:
+        path: "{{ pki_output_folder }}/{{ service.name }}.key"
+        size: 4096
+        state: present
+      delegate_to: localhost
+      tags:
+        - pki
+        - service-certs
+
+    - name: Generate CSR for {{ service.name }}
+      community.crypto.openssl_csr:
+        path: "{{ pki_output_folder }}/{{ service.name }}.csr"
+        privatekey_path: "{{ pki_output_folder }}/{{ service.name }}.key"
+
+        # Certificate Metadata
+        common_name: "{{ service.name }}"
+        organization_name: "{{ pki_ca_organization }}"
+        organizational_unit_name: "{{ pki_ca_organizational_unit }}"
+        country_name: "{{ pki_ca_country }}"
+        state_or_province_name: "{{ pki_ca_state }}"
+        locality_name: "{{ pki_ca_locality }}"
+
+        # Subject Alt Name(SANs)
+        subject_alt_name: "DNS:{{ service.dns }}"
+      delegate_to: localhost
+
+    - name: Sign Certificate for {{ service.name }}
+      community.crypto.x509_certificate:
+        path: "{{ pki_output_folder }}/{{ service.name }}.crt"
+        csr_path: "{{ pki_output_folder }}/{{ service.name }}.csr"
+
+        # Using Root CA
+        provider: ownca
+        ownca_path: "{{ pki_output_folder }}/root-ca.crt"
+        ownca_privatekey_path: "{{ pki_output_folder }}/private-key.pem"
+
+        # Expiriration within 1 Year for Security
+        ownca_not_after: "+365d"
+        ownca_not_before: "-1d"
+      delegate_to: localhost

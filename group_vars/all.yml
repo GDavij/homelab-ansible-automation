@@ -5,3 +5,42 @@ default_locales:
   - "pt-BR"
 
 default_locale: "en-US"
+
+# PKI Configuration
+pki_output_folder: "{{ playbook_dir }}/.pki_output/"
+pki_ca_common_name: "lab"
+pki_ca_organization: "Homelab"
+pki_ca_organizational_unit: "IT Department"
+pki_ca_country: "BR"
+pki_ca_state: "Sao_Paulo"
+pki_ca_locality: "Franca"
+pki_ca_email: "admin@lab.local"
+
+pki_services:
+  - name: adguard
+    dns: "dns.lab"
+    description: DNS Authority
+
+  - name: nginx_proxy_manager
+    dns: gateway.lab
+    description: Gateway Proxy
+
+  - name: casaos
+    dns: bastion.lab
+    description: Bastion Host CasaOs
+
+  - name: upnap
+    dns: snap.lab
+    description: Wakeup on Lan Host
+
+  - name: excalidraw
+    dns: draw.lab
+    description: Excalidraw Host
+
+  - name: memos
+    dns: daily.lab
+    description: Memos Host, Fleeting Notes/Daily Journal
+
+  - name: maybe_finance
+    dns: finance.lab
+    description: Maybe Finance Host, Financial Control

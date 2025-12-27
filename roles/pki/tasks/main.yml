@@ -1,0 +1,33 @@
+- name: Ensure that PKI Folder Exists
+  ansible.builtin.file:
+    path: "{{ pki_output_folder }}"
+    state: directory
+    mode: '0700'
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Generate Root Certificate Authority
+  ansible.builtin.include_tasks:
+    file: root-ca.yml
+  tags:
+    - pki
+    - root-ca
+
+- name: Generate Certificates for all Services
+  ansible.builtin.include_tasks:
+    file: service-certs.yml
+  loop: "{{ pki_services }}"
+  loop_control:
+    loop_var: service
+    label: "{{ service.name }} ({{ service.dns }})"
+  tags:
+    pki
+    service-certs
+
+- name: Deploy Certificate Root and Services Certificates into Hosts
+  ansible.builtin.include_tasks:
+    file: deploy-certs.yml
+  tags:
+    - pki
+    - deploy-certs

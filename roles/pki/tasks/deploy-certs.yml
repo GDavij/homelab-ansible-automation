@@ -1,0 +1,38 @@
+- name: Ensure PKI Directories Exists on Hosts
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  become: true
+  loop:
+    - /etc/pki/homelab/certs
+    - /etc/pki/homelab/keys
+  tags:
+    - pki
+    - upload
+
+- name: Deploy Root Certificate Authority
+  ansible.builtin.copy:
+    src: "{{ pki_output_folder }}/root-ca.crt"
+    dest: "/etc/pki/homelab/certs/root-ca.crt"
+    mode: '0644'
+  become: true
+  tags:
+    - pki
+    - upload
+
+- name: Deploy Service Certificate for Hosts
+  ansible.builtin.copy:
+    src: "{{ pki_output_folder }}/{{ item.0.name }}.{{ item.1.ext }}"
+    dest: "/etc/pki/homelab/{{ item.1.dir }}/{{ item.0.name }}.{{ item.1.ext }}"
+    owner: root
+    group: root
+    mode: "{{ item.1.mode }}"
+  become: true
+  with_nested:
+    - "{{ pki_services }}"
+    - - { ext: 'crt', dir: 'certs', mode: '0644' }
+      - { ext: 'key', dir: 'private', mode: '0600' }
+  tags:
+    - pki
+    - upload
