@@ -6,7 +6,7 @@
   become: true
   loop:
     - /etc/pki/homelab/certs
-    - /etc/pki/homelab/keys
+    - /etc/pki/homelab/private
   tags:
     - pki
     - upload
@@ -36,3 +36,36 @@
   tags:
     - pki
     - upload
+
+- name: Validate Deployed Certificates
+  community.crypto.x509_certificate_info:
+    path: "{{ pki_output_folder }}/{{ item.name }}.crt"
+  register: pki_cert_validation
+  delegate_to: localhost
+  become: false
+  loop: "{{ pki_services }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags:
+    - pki
+    - validate
+
+- name: Verify Certificate Properties
+  ansible.builtin.assert:
+    that:
+      - pki_cert_validation.results[ansible_loop.index0].subject.commonName == item.name
+      - pki_cert_validation.results[ansible_loop.index0].subject_alt_name | select('match', 'DNS:' + item.dns) | list | length > 0
+      - pki_cert_validation.results[ansible_loop.index0].issuer.commonName == pki_ca_common_name
+      - not pki_cert_validation.results[ansible_loop.index0].expired
+    fail_msg: "Certificate validation failed for {{ item.name }}"
+    success_msg: "Certificate {{ item.name }} is valid and properly configured"
+  delegate_to: localhost
+  become: false
+  loop: "{{ pki_services }}"
+  loop_control:
+    label: "{{ item.name }}"
+    extended: true
+    extended_allitems: false
+  tags:
+    - pki
+    - validate
