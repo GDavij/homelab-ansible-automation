@@ -33,3 +33,4 @@ id_ed25519
 
 # ---- Automation Outputs
 .ssh_keys
+.pki_output
