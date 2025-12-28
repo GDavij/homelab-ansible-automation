@@ -5,12 +5,10 @@ system_users:
     state: present
 
   - username: vanguard
-    groups: sudo, docker
+    groups: sudo,docker
     shell: /bin/bash
     state: present
 
 system_groups:
   - "sudo"
   - "docker"
-
-ssh_keys_dir: "{{ playbook_dir }}/.ssh_keys/bastion"

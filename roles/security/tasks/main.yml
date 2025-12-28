@@ -34,21 +34,8 @@
     append: true
     state: "{{ item.state }}"
     create_home: true
-    password_lock: true
+    password_lock: false
   become: true
-  loop: "{{ system_users }}"
-  loop_control:
-    label: "{{ item.username }}"
-
-- name: Inject User Keys
-  ansible.posix.authorized_key:
-    user: "{{ item.username }}"
-    key: "{{ lookup('file', ssh_keys_dir + '/' + item.username + '_id_ed25519.pub') }}"
-    state: present
-    exclusive: true
-  become: true
-  when:
-    - item.state | default('present') != 'absent'
   loop: "{{ system_users }}"
   loop_control:
     label: "{{ item.username }}"
@@ -67,7 +54,49 @@
   loop_control:
     label: "{{ item.username }}"
 
-- name: Hardening SSH Configuration
+- name: Inject User Keys
+  ansible.posix.authorized_key:
+    user: "{{ item.username }}"
+    key: "{{ lookup('file', ssh_keys_dir + '/' + item.username + '_id_ed25519.pub') }}"
+    state: present
+    exclusive: false
+  become: true
+  when:
+    - item.state | default('present') != 'absent'
+  loop: "{{ system_users }}"
+  loop_control:
+    label: "{{ item.username }}"
+
+- name: Verify SSH Key Authentication Works
+  ansible.builtin.command:
+    cmd: ssh -o PasswordAuthentication=no -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i {{ ssh_keys_dir }}/{{ item.username }}_id_ed25519 {{ item.username }}@{{ ansible_host }} 'echo "SSH key auth working for {{ item.username }}"'
+  delegate_to: localhost
+  become: false
+  loop: "{{ system_users }}"
+  loop_control:
+    label: "{{ item.username }}"
+  register: security_ssh_key_test
+  failed_when: false
+  changed_when: false
+  when:
+    - item.state | default('present') != 'absent'
+
+- name: Fail if SSH Key Authentication Not Working
+  ansible.builtin.fail:
+    msg: "SSH key authentication failed for {{ item.item.username }}. Cannot proceed with SSH hardening safely."
+  loop: "{{ security_ssh_key_test.results }}"
+  loop_control:
+    label: "{{ item.item.username }}"
+  when:
+    - item.rc is defined
+    - item.rc != 0
+
+- name: Ensure SSH Host exists (Prevent Connection Reset issues for Slow machines(Race Conditions))
+  ansible.builtin.command: ssh-keygen -A
+  changed_when: false
+  become: true
+
+- name: Hardening SSH Configuration (Safe settings first)
   ansible.builtin.lineinfile:
     path: /etc/ssh/sshd_config
     regexp: "{{ item.regexp }}"
@@ -75,10 +104,20 @@
     state: present
     validate: 'sshd -t -f %s'
   loop:
-    - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
     - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
     - { regexp: '^#?KerberosAuthentication', line: 'KerberosAuthentication no' }
     - { regexp: '^#?GSSAPIAuthentication', line: 'GSSAPIAuthentication no' }
     - { regexp: '^#?ChallengeResponseAuthentication', line: 'ChallengeResponseAuthentication no' }
   notify: Restart SSH
   become: true
+
+- name: Disable Password Authentication (LAST STEP)
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication'
+    line: 'PasswordAuthentication no'
+    state: present
+    validate: 'sshd -t -f %s'
+  notify: Restart SSH
+  become: true
+  tags: disable_password_auth

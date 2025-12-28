@@ -8,15 +8,24 @@
     state: present
   loop: "{{ default_locales }}"
 
+- name: "Check Current Locale"
+  ansible.builtin.command: "localectl status"
+  register: common_current_locale
+  changed_when: false
+  become: true
+
 - name: "Set Default Locale"
   ansible.builtin.command: "localectl set-locale LANG={{ default_locale }}"
-  changed_when: false
+  become: true
+  when: default_locale not in common_current_locale.stdout
+  changed_when: true
 
 - name: "Install NTP (Time Synchronization)"
   ansible.builtin.package:
     name: systemd-timesyncd
     state: present
   when: ansible_service_mgr == "systemd"
+  become: true
 
 - name: "System: Enable NTP Synchronization"
   ansible.builtin.service:
@@ -24,3 +33,4 @@
     state: started
     enabled: true
   when: ansible_service_mgr == "systemd"
+  become: true

@@ -44,3 +44,7 @@ pki_services:
   - name: maybe_finance
     dns: finance.lab
     description: Maybe Finance Host, Financial Control
+
+# SSH Key Management
+ssh_keys_dir: "{{ playbook_dir }}/.ssh_keys/{{ inventory_hostname }}"
+local_keys_dir: "{{ ssh_keys_dir }}"
