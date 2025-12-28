@@ -45,7 +45,7 @@
 - name: Allow ICMP Inbound Traffic on Underlay Network
   ansible.posix.firewalld:
     zone: underlay_network
-    rich_rule: 'rule protocol value="icmp" icmp-type name="echo-request" accept'
+    rich_rule: 'rule protocol value="icmp" accept'
     state: enabled
     permanent: true
     immediate: true
