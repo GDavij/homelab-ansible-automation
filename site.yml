@@ -3,6 +3,42 @@
   become: true
   gather_facts: true
   tasks:
+    - name: Common System Setup
+      ansible.builtin.import_role:
+        name: common
+      tags:
+        - common
+        - base
+
+    - name: Security Hardening
+      ansible.builtin.import_role:
+        name: security
+      tags:
+        - security
+        - users
+
+    - name: Network Gateway Configuration
+      ansible.builtin.import_role:
+        name: network_gateways
+      tags:
+        - network
+        - firewall
+      when: inventory_hostname in groups['Gateways']
+
+    - name: Setup Tailscale ZTN Tunnel
+      ansible.builtin.include_role:
+        name: Tailscale
+      tags:
+        - tailscale
+        - ztn
+
+    - name: PKI Certificate Management
+      ansible.builtin.import_role:
+        name: pki
+      tags:
+        - pki
+        - certificates
+
     - name: Install CasaOS for Gateways
       ansible.builtin.import_role:
         name: casaos

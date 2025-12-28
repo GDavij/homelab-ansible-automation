@@ -1,0 +1,56 @@
+---
+- name: Ensure Certificate Directories Exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  loop:
+    - /DATA/AppData/certificates
+    - /DATA/AppData/big-bear-adguard-home-host/certs
+    - /DATA/AppData/excalidraw/certs
+    - /DATA/AppData/big-bear-upsnap/certs
+    - /DATA/AppData/memos/certs
+    - /DATA/AppData/maybe/certs
+    - /DATA/AppData/nginxproxymanager/custom_ssl
+
+- name: Deploy Service Certificates
+  ansible.builtin.copy:
+    src: "{{ pki_output_folder }}/{{ item.service }}.crt"
+    dest: "/DATA/AppData/{{ item.path }}/{{ item.filename }}"
+    mode: '0644'
+    owner: root
+    group: root
+  loop:
+    - { service: 'adguard', path: 'big-bear-adguard-home-host/certs', filename: 'server.crt' }
+    - { service: 'excalidraw', path: 'excalidraw/certs', filename: 'server.crt' }
+    - { service: 'upsnap', path: 'big-bear-upsnap/certs', filename: 'server.crt' }
+    - { service: 'memos', path: 'memos/certs', filename: 'server.crt' }
+    - { service: 'maybe_finance', path: 'maybe/certs', filename: 'server.crt' }
+    - { service: 'nginx_proxy_manager', path: 'nginxproxymanager/custom_ssl', filename: 'nginx_proxy_manager.crt' }
+  notify: Restart_casaos_services
+
+- name: Deploy Service Private Keys
+  ansible.builtin.copy:
+    src: "{{ pki_output_folder }}/{{ item.service }}.key"
+    dest: "/DATA/AppData/{{ item.path }}/{{ item.filename }}"
+    mode: '0600'
+    owner: root
+    group: root
+  loop:
+    - { service: 'adguard', path: 'big-bear-adguard-home-host/certs', filename: 'server.key' }
+    - { service: 'excalidraw', path: 'excalidraw/certs', filename: 'server.key' }
+    - { service: 'upsnap', path: 'big-bear-upsnap/certs', filename: 'server.key' }
+    - { service: 'memos', path: 'memos/certs', filename: 'server.key' }
+    - { service: 'maybe_finance', path: 'maybe/certs', filename: 'server.key' }
+    - { service: 'nginx_proxy_manager', path: 'nginxproxymanager/custom_ssl', filename: 'nginx_proxy_manager.key' }
+  notify: Restart_casaos_services
+
+- name: Deploy Root CA Certificate for Trust
+  ansible.builtin.copy:
+    src: "{{ pki_output_folder }}/root-ca.crt"
+    dest: "/DATA/AppData/certificates/root-ca.crt"
+    mode: '0644'
+    owner: root
+    group: root

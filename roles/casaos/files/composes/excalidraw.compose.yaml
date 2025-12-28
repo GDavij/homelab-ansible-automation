@@ -1,0 +1,72 @@
+name: big-bear-excalidraw
+services:
+  app:
+    cpu_shares: 256
+    command: []
+    container_name: excalidraw-host
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+    hostname: excalidraw-host
+    image: excalidraw/excalidraw:latest
+    labels:
+      icon: https://cdn.jsdelivr.net/gh/bigbeartechworld/big-bear-universal-apps/apps/excalidraw/logo.png
+    ports:
+      - mode: ingress
+        target: 443
+        published: "8443"
+        protocol: tcp
+    restart: unless-stopped
+    x-casaos:
+      ports:
+        - container: "80"
+          description:
+            en_us: "Container Port: 80"
+    volumes:
+      - type: bind
+        source: "{{ pki_output_folder }}/excalidraw.crt"
+        target: /app/certs/server.crt
+        bind:
+          create_host_path: true
+      - type: bind
+        source: "{{ pki_output_folder }}/excalidraw.key"
+        target: /app/certs/server.key
+        bind:
+          create_host_path: true
+    devices: []
+    cap_add: []
+    environment:
+      - SSL_CERT_PATH=/app/certs/server.crt
+      - SSL_KEY_PATH=/app/certs/server.key
+      - HTTPS=true
+    networks:
+      - default
+    privileged: false
+networks:
+  default:
+    name: big-bear-excalidraw_default
+x-casaos:
+  architectures:
+    - amd64
+  author: BigBearTechWorld
+  category: BigBearCasaOS
+  description:
+    en_us: Virtual whiteboard for sketching hand-drawn like diagrams
+  developer: excalidraw
+  hostname: ""
+  icon: https://cdn.jsdelivr.net/gh/bigbeartechworld/big-bear-universal-apps/apps/excalidraw/logo.png
+  index: /
+  is_uncontrolled: false
+  main: app
+  port_map: "8443"
+  scheme: https
+  store_app_id: big-bear-excalidraw
+  tagline:
+    en_us: Virtual whiteboard for sketching hand-drawn like diagrams
+  thumbnail: ""
+  title:
+    custom: ""
+    en_us: Excalidraw

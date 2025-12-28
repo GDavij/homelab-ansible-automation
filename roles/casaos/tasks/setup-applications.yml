@@ -1,0 +1,21 @@
+- name: Upload Compose for Service {{ service.name }}
+  ansible.builtin.copy:
+    src: "./composes/{{ service.name }}.compose.yml"
+    dest: "/opt/hosting/docker/{{ service.name }}.compose.yml"
+    owner: root
+    mode: '0644'
+  become: true
+  tags:
+    - casaos
+    - applications
+
+- name: Start Service {{ service.name }}
+  ansible.builtin.docker_compose:
+    project_src: "/opt/hosting/docker/{{ service.name }}.compose.yml"
+    state: present
+    pull: true
+    restarted: true
+  become: true
+  tags:
+    - casaos
+    - applications
