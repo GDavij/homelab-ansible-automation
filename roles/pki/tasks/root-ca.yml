@@ -1,59 +1,74 @@
-- name: Generate Private Key for Lab
-  community.crypto.openssl_privatekey:
-    path: "{{ pki_output_folder }}/private-key.pem"
-    type: "RSA"
-    size: 4096
-    state: present
-    backup: true
-  run_once: true
-  delegate_to: localhost
-  tags:
-    - pki
-
-- name: Generate Signing Request for Lab
-  community.crypto.openssl_csr:
-    path: "{{ pki_output_folder }}/signing-request.csr"
-    privatekey_path: "{{ pki_output_folder }}/private-key.pem"
-    backup: true
-
-    # Certificate Metadata
-    common_name: "{{ pki_ca_common_name }}"
-    organization_name: "{{ pki_ca_organization }}"
-    organizational_unit_name: "{{ pki_ca_organizational_unit }}"
-    country_name: "{{ pki_ca_country }}"
-    state_or_province_name: "{{ pki_ca_state }}"
-    locality_name: "{{ pki_ca_locality }}"
-    email_address: "{{ pki_ca_email }}"
-
-    # Constraints for Root CA
-    basic_constraints:
-      - "CA:TRUE"
-    basic_constraints_critical: true
-    key_usage:
-      - keyCertSign
-      - cRLSign
-      - digitalSignature
-    key_usage_critical: true
-  run_once: true
-  delegate_to: localhost
-  tags:
-    - pki
-
-- name: Generate Root Certificate Authority
-  community.crypto.x509_certificate:
+- name: Check if Root CA already exists
+  ansible.builtin.stat:
     path: "{{ pki_output_folder }}/root-ca.crt"
-    privatekey_path: "{{ pki_output_folder }}/private-key.pem"
-    csr_path: "{{ pki_output_folder }}/signing-request.csr"
-    provider: selfsigned
-    backup: true
-
-    # Root CA Expiration
-    selfsigned_not_after: "+3650d"
-    selfsigned_not_before: "-1d"
-
-    # Selfsigned options
-    selfsigned_digest: sha512
-  run_once: true
+  register: pki_root_ca_exists
   delegate_to: localhost
+  become: false
   tags:
     - pki
+
+- name: Generate Root CA Infrastructure
+  when: not pki_root_ca_exists.stat.exists
+  block:
+    - name: Generate Private Key for Lab
+      community.crypto.openssl_privatekey:
+        path: "{{ pki_output_folder }}/private-key.pem"
+        type: "RSA"
+        size: 4096
+        state: present
+        backup: true
+      run_once: true
+      delegate_to: localhost
+      become: false
+      tags:
+        - pki
+
+    - name: Generate Signing Request for Lab
+      community.crypto.openssl_csr:
+        path: "{{ pki_output_folder }}/signing-request.csr"
+        privatekey_path: "{{ pki_output_folder }}/private-key.pem"
+        backup: true
+
+        # Certificate Metadata
+        common_name: "{{ pki_ca_common_name }}"
+        organization_name: "{{ pki_ca_organization }}"
+        organizational_unit_name: "{{ pki_ca_organizational_unit }}"
+        country_name: "{{ pki_ca_country }}"
+        state_or_province_name: "{{ pki_ca_state }}"
+        locality_name: "{{ pki_ca_locality }}"
+        email_address: "{{ pki_ca_email }}"
+
+        # Constraints for Root CA
+        basic_constraints:
+          - "CA:TRUE"
+        basic_constraints_critical: true
+        key_usage:
+          - keyCertSign
+          - cRLSign
+          - digitalSignature
+        key_usage_critical: true
+      run_once: true
+      delegate_to: localhost
+      become: false
+      tags:
+        - pki
+
+    - name: Generate Root Certificate Authority
+      community.crypto.x509_certificate:
+        path: "{{ pki_output_folder }}/root-ca.crt"
+        privatekey_path: "{{ pki_output_folder }}/private-key.pem"
+        csr_path: "{{ pki_output_folder }}/signing-request.csr"
+        provider: selfsigned
+        backup: true
+
+        # Root CA Expiration
+        selfsigned_not_after: "+3650d"
+        selfsigned_not_before: "-1d"
+
+        # Selfsigned options
+        selfsigned_digest: sha512
+      run_once: true
+      delegate_to: localhost
+      become: false
+      tags:
+        - pki
