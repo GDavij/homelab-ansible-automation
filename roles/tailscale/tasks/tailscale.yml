@@ -2,9 +2,13 @@
   ansible.builtin.stat:
     path: /usr/bin/tailscale
   register: tailscale_installed
+  tags:
+    - tailscale
 
 - name: Install Tailscale (Download Script and Install Script)
   when: not tailscale_installed.stat.exists
+  tags:
+    - tailscale
   block:
     - name: Download Tailscale Install Script
       ansible.builtin.get_url:
@@ -19,6 +23,8 @@
       changed_when: true
 
 - name: Enable and Authorize Tailscale
+  tags:
+    - tailscale
   block:
     - name: Ensure that Variable 'TAILSCALE_AUTH_KEY' in Set on Environment
       ansible.builtin.assert:
@@ -39,7 +45,7 @@
         cmd: >
           tailscale up
             --auth-key={{ lookup('env', 'TAILSCALE_AUTH_KEY') }}
-            --hostname={{ inventory_hostname }}
+            --hostname={{ inventory_hostname | replace('_automation', '') }}
             --advertise-routes={{ subnet_cidr }}
             --advertise-exit-node
             --accept-routes
