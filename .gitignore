@@ -9,6 +9,7 @@ inventory.ini.bkp
 # --- Dependências (Galaxy) ---
 collections/
 vendor_roles/
+galaxy_roles/
 
 # --- Segredos & Chaves (CRÍTICO) ---
 # Ignora qualquer chave privada ou certificado que você gere localmente

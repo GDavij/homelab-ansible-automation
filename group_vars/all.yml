@@ -14,37 +14,47 @@ pki_ca_organizational_unit: "IT Department"
 pki_ca_country: "BR"
 pki_ca_state: "Sao_Paulo"
 pki_ca_locality: "Franca"
-pki_ca_email: "admin@lab.local"
+pki_ca_email: "admin@lab"
 
 pki_services:
   - name: adguard
     dns: "dns.lab"
     description: DNS Authority
+    ip: 192.168.1.77
 
-  - name: nginx_proxy_manager
+  - name: traefik
     dns: gateway.lab
     description: Gateway Proxy
-
-  - name: casaos
-    dns: bastion.lab
-    description: Bastion Host CasaOs
+    ip: 192.168.1.77
 
   - name: upsnap
     dns: snap.lab
     description: Wakeup on Lan Host
+    ip: 192.168.1.77
 
   - name: excalidraw
     dns: draw.lab
     description: Excalidraw Host
+    ip: 192.168.1.77
 
   - name: memos
     dns: daily.lab
     description: Memos Host, Fleeting Notes/Daily Journal
+    ip: 192.168.1.77
 
   - name: maybe_finance
     dns: finance.lab
     description: Maybe Finance Host, Financial Control
+    ip: 192.168.1.77
+
+  - name: controller
+    dns: controller.arch.lab
+    description: Controller Client Certificate
+    ip: 192.168.1.90
 
 # SSH Key Management
 ssh_keys_dir: "{{ playbook_dir }}/.ssh_keys/{{ inventory_hostname }}"
 local_keys_dir: "{{ ssh_keys_dir }}"
+
+docker_install_compose_plugin: true
+docker_compose_package_state: present

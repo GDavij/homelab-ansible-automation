@@ -1,0 +1,38 @@
+http:
+  serversTransports:
+{% for service in pki_services %}
+    {{ service.name }}-transport:
+      serverName: "{{ service.dns }}"
+      insecureSkipVerify: false
+      rootCAs:
+        - /etc/traefik/certs/lab_root_ca.crt
+      certificates:
+        - certFile: /etc/traefik/certs/traefik.crt
+          keyFile: /etc/traefik/private/traefik.key
+      maxIdleConnsPerHost: 42
+      forwardingTimeouts:
+        dialTimeout: 30s
+        responseHeaderTimeout: 60s
+        idleConnTimeout: 120s
+        readIdleTimeout: 60s
+
+{% endfor %}
+
+tls:
+  certificates:
+    - certFile: /etc/traefik/certs/traefik.crt
+      keyFile: /etc/traefik/private/traefik.key
+  options:
+    default:
+      minVersion: "VersionTLS12"
+      maxVersion: "VersionTLS13"
+      cipherSuites:
+        - "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+        - "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
+        - "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+      clientAuth:
+        caFiles:
+          - /etc/traefik/certs/lab_root_ca.crt
+        clientAuthType: RequireAndVerifyClientCert
+      sniStrict: true
+      preferServerCipherSuites: true

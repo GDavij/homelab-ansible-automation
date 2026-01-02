@@ -25,12 +25,13 @@
         - firewall
       when: inventory_hostname in groups['Gateways']
 
-    - name: Setup Tailscale ZTN Tunnel
+    - name: Setup Tailscale ZTN Tunnel (Optional)
       ansible.builtin.include_role:
         name: tailscale
       tags:
         - tailscale
         - ztn
+      when: enable_tailscale | default(false)
 
     - name: PKI Certificate Management
       ansible.builtin.import_role:
@@ -39,9 +40,17 @@
         - pki
         - certificates
 
-    - name: Install CasaOS for Gateways
+    - name: Docker Installation
       ansible.builtin.import_role:
-        name: casaos
+        name: docker
       tags:
-        - gateway
-        - casaos
+        - docker
+
+    - name: Infrastructure Gateway Services
+      ansible.builtin.import_role:
+        name: infra_gateways
+      tags:
+        - infra_gateways
+        - traefik
+        - adguard
+      when: inventory_hostname in groups['Gateways']

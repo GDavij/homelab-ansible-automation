@@ -1,0 +1,85 @@
+- name: Create Docker core_net for Core Infrastructure Services
+  community.docker.docker_network:
+    name: core_net
+    state: present
+    driver: bridge
+    ipam_config:
+      - subnet: 172.20.0.0/24
+        gateway: 172.20.0.1
+  become: true
+  tags:
+    - infra_gateways
+
+- name: Create Docker proxy_net for Traefik Application That will be proxied
+  community.docker.docker_network:
+    name: proxy_net
+    state: present
+    driver: bridge
+    ipam_config:
+      - subnet: 172.21.0.0/24
+        gateway: 172.21.0.1
+  become: true
+  tags:
+    - infra_gateways
+
+- name: Create Core Folders for Running Infrastructure Critical Services
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  become: true
+  loop:
+    - /opt/core/adguard
+    - /opt/core/adguard/conf
+    - /opt/core/adguard/work
+    - /opt/core/traefik
+    - /opt/core/traefik/conf
+    - /opt/core/traefik/certs
+    - /opt/core/traefik/dynamic
+    - /composes
+  tags:
+    - infra_gateways
+
+- name: Build Traefik Dynamic Config J2 Template
+  ansible.builtin.template:
+    src: templates/traefik-dynamic.yml.j2
+    dest: /opt/core/traefik/dynamic/traefik-dynamic.yml
+    mode: '0644'
+  become: true
+  tags:
+    - infra_gateways
+
+- name: Build Infrastructure Services Docker Compose
+  ansible.builtin.template:
+    src: templates/infra_services.compose.j2
+    dest: /composes/infra_core_services.compose.yml
+    mode: '0644'
+  become: true
+  tags:
+    - infra_gateways
+
+- name: Generate AdGuard config in conf directory (prevents setup wizard)
+  ansible.builtin.template:
+    src: templates/adguard.yml.j2
+    dest: /opt/core/adguard/conf/AdGuardHome.yaml
+    owner: 999  # AdGuard default UID
+    group: 999
+    mode: '0644'
+    force: true
+  become: true
+  tags:
+    - infra_gateways
+
+- name: Deploy Core Infrastructure Services
+  community.docker.docker_compose_v2:
+    state: present
+    project_src: /composes
+    files:
+      - infra_core_services.compose.yml
+    project_name: infra_core_services
+    pull: missing
+    remove_orphans: true
+    recreate: always
+  become: true
+  tags:
+    - infra_gateways

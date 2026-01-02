@@ -1,0 +1,95 @@
+{% macro ztn_labels(name, dns, port=80, scheme='https') -%}
+- "traefik.enable=true"
+- "traefik.http.routers.{{ name }}.rule=Host(`{{ dns }}`)"
+- "traefik.http.routers.{{ name }}.entrypoints=websecure"
+- "traefik.http.routers.{{ name }}.tls=true"
+- "traefik.http.services.{{ name }}.loadbalancer.server.port={{ port }}"
+- "traefik.http.services.{{ name }}.loadbalancer.server.scheme={{ scheme }}"
+- "traefik.http.services.{{ name }}.loadbalancer.serverstransport={{ name }}-transport@file"
+{%- endmacro %}
+
+# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-go/master/schema/compose-spec.json
+
+services:
+  gateway:
+    image: traefik:v3.6.6
+    container_name: gateway
+    restart: unless-stopped
+    expose:
+      - 80
+      - 443
+      - 8080
+      
+    ports:
+      - "80:80"
+      - "443:443"
+      
+    networks: 
+      - core_net
+      - proxy_net
+    
+    command:
+      - "--providers.docker=true"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      - "--log.level=INFO"
+      
+    volumes:
+      - /opt/core/traefik/dynamic:/etc/traefik/dynamic
+      - /etc/pki/homelab/certs/root-ca.crt:/etc/traefik/certs/lab_root_ca.crt:ro
+      - /etc/pki/homelab/certs/traefik.crt:/etc/traefik/certs/traefik.crt:ro
+      - /etc/pki/homelab/private/traefik.key:/etc/traefik/certs/traefik.key:ro
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`gateway.lab`)"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls=true"
+      - "traefik.http.routers.traefik.tls.options=default@file"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+      - "traefik.http.services.traefik.loadbalancer.server.scheme=http"
+
+  dns:
+    image: adguard/adguardhome:latest
+    container_name: dns_adguard
+    restart: unless-stopped
+    networks:
+      - core_net
+    expose:
+      - 80
+      - 443
+      - 53
+      - 853
+      - 5443
+      
+    ports:
+      - "53:53/udp"
+      - "53:53/tcp"
+      - "853:853/tcp"
+      - "853:853/udp"
+      - "5443:5443/tcp"
+
+    volumes:
+      - /opt/core/adguard/work:/opt/adguardhome/work
+      - /opt/core/adguard/conf:/opt/adguardhome/conf
+      - /etc/pki/homelab/certs/adguard.crt:/opt/adguardhome/conf/adguard.crt:ro
+      - /etc/pki/homelab/private/adguard.key:/opt/adguardhome/conf/adguard.key:ro
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.adguard.rule=Host(`dns.lab`)"
+      - "traefik.http.routers.adguard.entrypoints=websecure"
+      - "traefik.http.routers.adguard.tls=true"
+      - "traefik.http.services.adguard.loadbalancer.server.port=443"
+      - "traefik.http.services.adguard.loadbalancer.server.scheme=https"
+      - "traefik.http.services.adguard.loadbalancer.serverstransport=adguard-transport@file"
+      - "traefik.http.routers.adguard.tls.options=default@file"
+
+networks:
+  core_net:
+    external: true
+  proxy_net:
+    external: true
