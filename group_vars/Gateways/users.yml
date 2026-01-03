@@ -1,14 +1,18 @@
+# System Groups and Users Configuration
+system_groups:
+  - sudo
+  - docker
+  - ssl-cert
+
 system_users:
   - username: gatekeeper
-    groups: sudo,docker
+    groups: sudo,docker,ssl-cert
     shell: /bin/bash
     state: present
-
   - username: vanguard
-    groups: sudo,docker
+    groups: sudo,docker,ssl-cert
     shell: /bin/bash
     state: present
 
-system_groups:
-  - "sudo"
-  - "docker"
+# SSL Certificate Group
+ssl_cert_group: docker

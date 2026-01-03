@@ -67,29 +67,48 @@
   loop_control:
     label: "{{ item.username }}"
 
-- name: Verify SSH Key Authentication Works
+- name: Check if SSH keys already exist and are deployed
+  ansible.builtin.stat:
+    path: "~{{ item.username }}/.ssh/authorized_keys"
+  register: ssh_keys_deployed
+  become: true
+  loop: "{{ system_users }}"
+  loop_control:
+    label: "{{ item.username }}"
+  when:
+    - item.state | default('present') != 'absent'
+
+- name: Verify SSH Key Authentication Works (only if keys exist)
   ansible.builtin.command:
-    cmd: ssh -o PasswordAuthentication=no -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i {{ ssh_keys_dir }}/{{ item.username }}_id_ed25519 {{ item.username }}@{{ ansible_host }} 'echo "SSH key auth working for {{ item.username }}"'
+    cmd: >-
+      ssh -o PasswordAuthentication=no -o ConnectTimeout=10 
+      -o StrictHostKeyChecking=no 
+      -i {{ ssh_keys_dir }}/{{ item.username }}_id_ed25519 
+      {{ item.username }}@{{ ansible_default_ipv4.address }} 
+      'echo "SSH key auth working for {{ item.username }}"'
   delegate_to: localhost
   become: false
   loop: "{{ system_users }}"
   loop_control:
     label: "{{ item.username }}"
+    index_var: user_index
   register: security_ssh_key_test
   failed_when: false
   changed_when: false
   when:
     - item.state | default('present') != 'absent'
+    - ssh_keys_deployed.results[user_index].stat.exists | default(false)
 
-- name: Fail if SSH Key Authentication Not Working
+- name: Fail if SSH Key Authentication Not Working (only for existing deployments)
   ansible.builtin.fail:
     msg: "SSH key authentication failed for {{ item.item.username }}. Cannot proceed with SSH hardening safely."
-  loop: "{{ security_ssh_key_test.results }}"
+  loop: "{{ security_ssh_key_test.results | default([]) }}"
   loop_control:
-    label: "{{ item.item.username }}"
+    label: "{{ item.item.username | default('unknown') }}"
   when:
     - item.rc is defined
     - item.rc != 0
+    - not (ansible_ssh_pass is defined or ansible_become_pass is defined)
 
 - name: Ensure SSH Host exists (Prevent Connection Reset issues for Slow machines(Race Conditions))
   ansible.builtin.command: ssh-keygen -A
@@ -111,7 +130,7 @@
   notify: Restart SSH
   become: true
 
-- name: Disable Password Authentication (LAST STEP)
+- name: Disable Password Authentication (LAST STEP - only if SSH keys work or initial setup)
   ansible.builtin.lineinfile:
     path: /etc/ssh/sshd_config
     regexp: '^#?PasswordAuthentication'
@@ -120,4 +139,7 @@
     validate: 'sshd -t -f %s'
   notify: Restart SSH
   become: true
+  when: >
+    (security_ssh_key_test.results | default([]) | selectattr('rc', 'defined') | selectattr('rc', 'equalto', 0) | list | length > 0) or
+    (ansible_ssh_pass is defined or ansible_become_pass is defined)
   tags: disable_password_auth
