@@ -1,4 +1,10 @@
 http:
+  middlewares:
+    traefik-auth:
+      basicAuth:
+        users:
+          - "{{ traefik_username }}:{{ traefik_password_hash }}"
+
   serversTransports:
 {% for service in pki_services %}
     {{ service.name }}-transport:

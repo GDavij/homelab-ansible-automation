@@ -1,0 +1,5 @@
+# Traefik Dashboard Authentication
+traefik_username: "gatekeeper"
+# Pre-generated bcrypt hash for password "changeme" (rounds=12)
+# Generated using: python3 scripts/generate_adguard_password.py
+traefik_password_hash: "$2b$12$JA8MBJtr4lkUJijw2d9BeOEI4x.S4n4o.dqTWZdi9BlBfeirytl6G"
