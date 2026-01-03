@@ -1,6 +1,6 @@
 - name: Check if Root CA already exists
   ansible.builtin.stat:
-    path: "{{ pki_output_folder }}/root-ca.crt"
+    path: "{{ pki_output_folder }}/authorities/root-ca.crt"
   register: pki_root_ca_exists
   delegate_to: localhost
   become: false
@@ -12,7 +12,7 @@
   block:
     - name: Generate Private Key for Lab
       community.crypto.openssl_privatekey:
-        path: "{{ pki_output_folder }}/private-key.pem"
+        path: "{{ pki_output_folder }}/authorities/root-ca.key"
         type: "RSA"
         size: 4096
         state: present
@@ -25,8 +25,8 @@
 
     - name: Generate Signing Request for Lab
       community.crypto.openssl_csr:
-        path: "{{ pki_output_folder }}/signing-request.csr"
-        privatekey_path: "{{ pki_output_folder }}/private-key.pem"
+        path: "{{ pki_output_folder }}/authorities/root-ca.csr"
+        privatekey_path: "{{ pki_output_folder }}/authorities/root-ca.key"
         backup: true
 
         # Certificate Metadata
@@ -55,9 +55,9 @@
 
     - name: Generate Root Certificate Authority
       community.crypto.x509_certificate:
-        path: "{{ pki_output_folder }}/root-ca.crt"
-        privatekey_path: "{{ pki_output_folder }}/private-key.pem"
-        csr_path: "{{ pki_output_folder }}/signing-request.csr"
+        path: "{{ pki_output_folder }}/authorities/root-ca.crt"
+        privatekey_path: "{{ pki_output_folder }}/authorities/root-ca.key"
+        csr_path: "{{ pki_output_folder }}/authorities/root-ca.csr"
         provider: selfsigned
         backup: true
 
@@ -73,52 +73,12 @@
       tags:
         - pki
 
-    - name: Create Firefox-Compatible Certificate (PEM format)
-      ansible.builtin.copy:
-        src: "{{ pki_output_folder }}/root-ca.crt"
-        dest: "{{ pki_output_folder }}/homelab-root-ca.pem"
-        mode: '0644'
-      delegate_to: localhost
-      become: false
-      tags:
-        - pki
-
-    - name: Create Browsers Directory
-      ansible.builtin.file:
-        path: "{{ pki_output_folder }}/browsers"
-        state: directory
-        mode: '0755'
-      delegate_to: localhost
-      become: false
-      tags:
-        - pki
-
-    - name: Create Browser-Compatible Certificate with Matching Names
-      ansible.builtin.copy:
-        src: "{{ pki_output_folder }}/root-ca.crt"
-        dest: "{{ pki_output_folder }}/browsers/homelab-root-ca.crt"
-        mode: '0644'
-      delegate_to: localhost
-      become: false
-      tags:
-        - pki
-
-    - name: Copy Private Key for PKCS#12 Generation
-      ansible.builtin.copy:
-        src: "{{ pki_output_folder }}/private-key.pem"
-        dest: "{{ pki_output_folder }}/browsers/homelab-root-ca.key"
-        mode: '0600'
-      delegate_to: localhost
-      become: false
-      tags:
-        - pki
-
     - name: Generate PKCS#12 Certificate for Firefox
       community.crypto.openssl_pkcs12:
         action: export
-        path: "{{ pki_output_folder }}/browsers/homelab-root-ca.p12"
-        certificate_path: "{{ pki_output_folder }}/browsers/homelab-root-ca.crt"
-        privatekey_path: "{{ pki_output_folder }}/browsers/homelab-root-ca.key"
+        path: "{{ pki_output_folder }}/authorities/root-ca.p12"
+        certificate_path: "{{ pki_output_folder }}/authorities/root-ca.crt"
+        privatekey_path: "{{ pki_output_folder }}/authorities/root-ca.key"
         friendly_name: "Homelab Root CA"
         passphrase: "homelab"
         mode: '0644'
@@ -139,7 +99,7 @@
           4. Click "View Certificates"
           5. Go to "Authorities" tab
           6. Click "Import..."
-          7. Select: {{ pki_output_folder }}/browsers/homelab-root-ca.p12
+          7. Select: {{ pki_output_folder }}/authorities/root-ca.p12
           8. Enter password: homelab
           9. Check "Trust this CA to identify websites"
           10. Click OK
@@ -151,7 +111,7 @@
           4. Click "View Certificates"
           5. Go to "Authorities" tab
           6. Click "Import..."
-          7. Select: {{ pki_output_folder }}/browsers/homelab-root-ca.crt
+          7. Select: {{ pki_output_folder }}/authorities/root-ca.crt
           8. Check "Trust this CA to identify websites"
           9. Click OK
 
@@ -161,32 +121,30 @@
           3. Click "Manage certificates"
           4. Go to "Authorities" tab
           5. Click "Import"
-          6. Select: {{ pki_output_folder }}/browsers/homelab-root-ca.crt
+          6. Select: {{ pki_output_folder }}/authorities/root-ca.crt
           7. Check "Trust this certificate for identifying websites"
           8. Click OK
 
           ## Command Line Verification:
           ```bash
           # View certificate details
-          openssl x509 -in {{ pki_output_folder }}/browsers/homelab-root-ca.crt -text -noout
+          openssl x509 -in {{ pki_output_folder }}/authorities/root-ca.crt -text -noout
 
           # Verify certificate
-          openssl verify -CAfile {{ pki_output_folder }}/browsers/homelab-root-ca.crt {{ pki_output_folder }}/browsers/homelab-root-ca.crt
+          openssl verify -CAfile {{ pki_output_folder }}/authorities/root-ca.crt {{ pki_output_folder }}/authorities/root-ca.crt
 
           # View PKCS#12 contents
-          openssl pkcs12 -in {{ pki_output_folder }}/browsers/homelab-root-ca.p12 -info -noout
+          openssl pkcs12 -in {{ pki_output_folder }}/authorities/root-ca.p12 -info -noout
           ```
 
           ## Files Generated:
-          ### Main PKI Files:
-          - {{ pki_output_folder }}/root-ca.crt (Main certificate)
-          - {{ pki_output_folder }}/private-key.pem (Private key - keep secure!)
-          - {{ pki_output_folder }}/homelab-root-ca.pem (PEM format copy)
+          ### Certificate Authority Files:
+          - {{ pki_output_folder }}/authorities/root-ca.crt (Root CA certificate)
+          - {{ pki_output_folder }}/authorities/root-ca.key (Root CA private key - keep secure!)
+          - {{ pki_output_folder }}/authorities/root-ca.p12 (PKCS#12 format - password: homelab)
 
-          ### Browser-Ready Files:
-          - {{ pki_output_folder }}/browsers/homelab-root-ca.crt (Browser certificate)
-          - {{ pki_output_folder }}/browsers/homelab-root-ca.key (Browser private key)
-          - {{ pki_output_folder }}/browsers/homelab-root-ca.p12 (PKCS#12 format - password: homelab)
+          ### User Certificate Files:
+          - {{ pki_output_folder }}/user_certs/ (Client certificates for user authentication)
 
           ## Security Notes:
           - The private key files should never be shared or moved from this machine
@@ -195,7 +153,7 @@
           - PKCS#12 password is: homelab (change if needed for production)
 
           ## Recommended Import Method:
-          Use the PKCS#12 file (homelab-root-ca.p12) for Firefox as it includes both
+          Use the PKCS#12 file (root-ca.p12) for Firefox as it includes both
           certificate and key with matching names, ensuring better compatibility.
         dest: "{{ pki_output_folder }}/BROWSER_IMPORT_INSTRUCTIONS.md"
         mode: '0644'

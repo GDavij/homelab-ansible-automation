@@ -13,7 +13,7 @@
 
 - name: Deploy Root Certificate Authority
   ansible.builtin.copy:
-    src: "{{ pki_output_folder }}/root-ca.crt"
+    src: "{{ pki_output_folder }}/authorities/root-ca.crt"
     dest: "/etc/pki/homelab/certs/root-ca.crt"
     mode: '0644'
   become: true
@@ -26,13 +26,13 @@
     src: "{{ pki_output_folder }}/{{ item.0.name }}.{{ item.1.ext }}"
     dest: "/etc/pki/homelab/{{ item.1.dir }}/{{ item.0.name }}.{{ item.1.ext }}"
     owner: root
-    group: root
+    group: "{{ ssl_cert_group | default('root') }}"
     mode: "{{ item.1.mode }}"
   become: true
   with_nested:
     - "{{ pki_services }}"
     - - { ext: 'crt', dir: 'certs', mode: '0644' }
-      - { ext: 'key', dir: 'private', mode: '0600' }
+      - { ext: 'key', dir: 'private', mode: '0644' }
   tags:
     - pki
     - upload
@@ -53,7 +53,7 @@
 - name: Verify Certificate Properties
   ansible.builtin.assert:
     that:
-      - pki_cert_validation.results[ansible_loop.index0].subject.commonName == item.name
+      - pki_cert_validation.results[ansible_loop.index0].subject.commonName == item.dns
       - pki_cert_validation.results[ansible_loop.index0].subject_alt_name | select('match', 'DNS:' + item.dns) | list | length > 0
       - pki_cert_validation.results[ansible_loop.index0].issuer.commonName == pki_ca_common_name
       - not pki_cert_validation.results[ansible_loop.index0].expired

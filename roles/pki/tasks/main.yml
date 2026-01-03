@@ -7,6 +7,20 @@
   become: false
   run_once: true
 
+- name: Create PKI Subdirectories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  become: false
+  run_once: true
+  loop:
+    - "{{ pki_output_folder }}/authorities"
+    - "{{ pki_output_folder }}/user_certs"
+  tags:
+    - pki
+
 - name: Generate Root Certificate Authority
   ansible.builtin.include_tasks:
     file: root-ca.yml
@@ -24,6 +38,14 @@
   tags:
     pki
     service-certs
+
+- name: Generate Client Certificates for mTLS Authentication
+  ansible.builtin.include_tasks:
+    file: client-certs.yml
+  when: pki_client_devices is defined and pki_client_devices | length > 0
+  tags:
+    - pki
+    - client-certs
 
 - name: Deploy Certificate Root and Services Certificates into Hosts
   ansible.builtin.include_tasks:

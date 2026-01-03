@@ -10,7 +10,7 @@
 
 - name: Verify Root CA are uploaded
   ansible.builtin.stat:
-    path: "{{ pki_output_folder }}/root-ca.crt"
+    path: "{{ pki_output_folder }}/authorities/root-ca.crt"
   register: pki_root_ca_stat
   delegate_to: localhost
   become: false
@@ -39,7 +39,9 @@
     - name: Generate Private Key for {{ service.name }}
       community.crypto.openssl_privatekey:
         path: "{{ pki_output_folder }}/{{ service.name }}.key"
+        type: RSA
         size: 4096
+        format: pkcs8
         state: present
       delegate_to: localhost
       tags:
@@ -52,7 +54,7 @@
         privatekey_path: "{{ pki_output_folder }}/{{ service.name }}.key"
 
         # Certificate Metadata
-        common_name: "{{ service.name }}"
+        common_name: "{{ service.dns }}"
         organization_name: "{{ pki_ca_organization }}"
         organizational_unit_name: "{{ pki_ca_organizational_unit }}"
         country_name: "{{ pki_ca_country }}"
@@ -61,6 +63,15 @@
 
         # Subject Alt Name(SANs)
         subject_alt_name: "DNS:{{ service.dns }}"
+
+        # Critical extensions for browser trust
+        key_usage:
+          - digitalSignature
+          - keyEncipherment
+        key_usage_critical: true
+        extended_key_usage:
+          - serverAuth
+        extended_key_usage_critical: true
       delegate_to: localhost
 
     - name: Sign Certificate for {{ service.name }}
@@ -70,8 +81,8 @@
 
         # Using Root CA
         provider: ownca
-        ownca_path: "{{ pki_output_folder }}/root-ca.crt"
-        ownca_privatekey_path: "{{ pki_output_folder }}/private-key.pem"
+        ownca_path: "{{ pki_output_folder }}/authorities/root-ca.crt"
+        ownca_privatekey_path: "{{ pki_output_folder }}/authorities/root-ca.key"
 
         # Expiriration within 1 Year for Security
         ownca_not_after: "+365d"

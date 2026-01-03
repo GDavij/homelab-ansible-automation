@@ -1,0 +1,157 @@
+---
+- name: Generate Client Private Keys
+  community.crypto.openssl_privatekey:
+    path: "{{ pki_output_folder }}/user_certs/{{ item.name }}.key"
+    type: RSA
+    size: 4096
+    format: pkcs8
+    state: present
+    mode: '0600'
+  delegate_to: localhost
+  become: false
+  run_once: true
+  loop: "{{ pki_client_devices }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags:
+    - pki
+    - client-certs
+
+- name: Generate Client Certificate Signing Requests
+  community.crypto.openssl_csr:
+    path: "{{ pki_output_folder }}/user_certs/{{ item.name }}.csr"
+    privatekey_path: "{{ pki_output_folder }}/user_certs/{{ item.name }}.key"
+
+    # Client Certificate Metadata
+    common_name: "{{ item.common_name }}"
+    organization_name: "{{ pki_ca_organization }}"
+    organizational_unit_name: "{{ pki_ca_organizational_unit }}"
+    country_name: "{{ pki_ca_country }}"
+    state_or_province_name: "{{ pki_ca_state }}"
+    locality_name: "{{ pki_ca_locality }}"
+    email_address: "{{ item.user }}@{{ pki_ca_common_name }}"
+
+    # Client certificate extensions
+    key_usage:
+      - digitalSignature
+      - keyEncipherment
+    extended_key_usage:
+      - clientAuth
+  delegate_to: localhost
+  become: false
+  run_once: true
+  loop: "{{ pki_client_devices }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags:
+    - pki
+    - client-certs
+
+- name: Sign Client Certificates
+  community.crypto.x509_certificate:
+    path: "{{ pki_output_folder }}/user_certs/{{ item.name }}.crt"
+    csr_path: "{{ pki_output_folder }}/user_certs/{{ item.name }}.csr"
+
+    # Using Root CA to sign
+    provider: ownca
+    ownca_path: "{{ pki_output_folder }}/authorities/root-ca.crt"
+    ownca_privatekey_path: "{{ pki_output_folder }}/authorities/root-ca.key"
+
+    # Client certificate validity
+    ownca_not_after: "+365d"
+    ownca_not_before: "-1d"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  loop: "{{ pki_client_devices }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags:
+    - pki
+    - client-certs
+- name: Generate PKCS#12 Client Certificates for Browser Import
+  community.crypto.openssl_pkcs12:
+    action: export
+    path: "{{ pki_output_folder }}/user_certs/{{ item.name }}.p12"
+    certificate_path: "{{ pki_output_folder }}/user_certs/{{ item.name }}.crt"
+    privatekey_path: "{{ pki_output_folder }}/user_certs/{{ item.name }}.key"
+    other_certificates:
+      - "{{ pki_output_folder }}/authorities/root-ca.crt"
+    friendly_name: "{{ item.common_name }} - {{ item.description }}"
+    passphrase: "homelab"
+    mode: '0644'
+  delegate_to: localhost
+  become: false
+  run_once: true
+  loop: "{{ pki_client_devices }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags:
+    - pki
+    - client-certs
+
+- name: Create Client Certificate Installation Instructions
+  ansible.builtin.copy:
+    content: |
+      # Client Certificate Installation Instructions
+
+      ## Generated Client Certificates:
+      {% for device in pki_client_devices %}
+      ### {{ device.common_name }} ({{ device.name }})
+      - Certificate: user_certs/{{ device.name }}.crt
+      - Private Key: user_certs/{{ device.name }}.key
+      - PKCS#12 Bundle: user_certs/{{ device.name }}.p12 (password: homelab)
+
+      {% endfor %}
+
+      ## Browser Installation:
+
+      ### Firefox:
+      1. Settings → Privacy & Security → Certificates → View Certificates
+      2. Go to "Your Certificates" tab
+      3. Click "Import..."
+      4. Select the .p12 file for your device
+      5. Enter password: homelab
+      6. Certificate will be automatically used for mTLS
+
+      ### Chrome/Chromium:
+      1. Settings → Privacy and Security → Security → Manage certificates
+      2. Go to "Your certificates" tab
+      3. Click "Import"
+      4. Select the .p12 file for your device
+      5. Enter password: homelab
+      6. Certificate will be automatically used for mTLS
+
+      ### Android:
+      1. Copy .p12 file to device
+      2. Settings → Security → Install from storage
+      3. Select the .p12 file
+      4. Enter password: homelab
+      5. Give it a name and select "Used for VPN and apps"
+
+      ### iOS:
+      1. Email .p12 file to yourself or use AirDrop
+      2. Open the file attachment
+      3. Install Profile → Enter password: homelab
+      4. Settings → General → About → Certificate Trust Settings
+      5. Enable full trust for the certificate
+
+      ## Testing mTLS:
+      After installing both Root CA and Client Certificate:
+      1. Visit https://dns.lab in your browser
+      2. Browser should automatically present client certificate
+      3. Connection should succeed with green lock
+
+      ## Security Notes:
+      - Keep .key files secure and never share them
+      - .p12 files contain both certificate and private key
+      - Each device should use its own unique client certificate
+      - Certificates are valid for 1 year from generation date
+    dest: "{{ pki_output_folder }}/CLIENT_CERTIFICATE_INSTRUCTIONS.md"
+    mode: '0644'
+  delegate_to: localhost
+  become: false
+  run_once: true
+  tags:
+    - pki
+    - client-certs

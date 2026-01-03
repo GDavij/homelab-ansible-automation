@@ -47,14 +47,23 @@ pki_services:
     description: Maybe Finance Host, Financial Control
     ip: 192.168.1.77
 
-  - name: controller
-    dns: controller.arch.lab
-    description: Controller Client Certificate
-    ip: 192.168.1.90
-
 # SSH Key Management
 ssh_keys_dir: "{{ playbook_dir }}/.ssh_keys/{{ inventory_hostname }}"
 local_keys_dir: "{{ ssh_keys_dir }}"
 
+# Client Devices for mTLS Authentication
+pki_client_devices:
+  - name: controller
+    common_name: "Controller Arhc Linux Notebook"
+    description: "Controller Client Certificate"
+    user: "gdavij"
+
+  - name: cellphone
+    common_name: "Mobile Device Certificate"
+    description: "Cellphone Client Certificate"
+    user: "gdavij"
+
 docker_install_compose_plugin: true
 docker_compose_package_state: present
+
+enable_tailscale: true
