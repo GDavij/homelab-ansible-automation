@@ -1,8 +1,8 @@
 # AdGuard Home Configuration Variables
 adguard_username: "gatekeeper"
-# Pre-generated bcrypt hash for password "admin123" (rounds=10)
-# Generated using: htpasswd -B -n -b gatekeeper admin123
-adguard_password_hash: "$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi"
+# Pre-generated bcrypt hash for password "changeme" (rounds=12)
+# Generated using: python3 generate_adguard_password.py
+adguard_password_hash: "$2b$12$JA8MBJtr4lkUJijw2d9BeOEI4x.S4n4o.dqTWZdi9BlBfeirytl6G"
 
 # AdGuard DNS Settings
 adguard_upstream_dns:

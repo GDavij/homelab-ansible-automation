@@ -38,17 +38,20 @@ services:
       - "--log.level=INFO"
       
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - /opt/core/traefik/dynamic:/etc/traefik/dynamic
       - /etc/pki/homelab/certs/root-ca.crt:/etc/traefik/certs/lab_root_ca.crt:ro
-      - /etc/pki/homelab/certs/traefik.crt:/etc/traefik/certs/traefik.crt:ro
-      - /etc/pki/homelab/private/traefik.key:/etc/traefik/certs/traefik.key:ro
+{% for service in pki_services %}
+      - /etc/pki/homelab/certs/{{ service.name }}.crt:/etc/traefik/certs/{{ service.name }}.crt:ro
+      - /etc/pki/homelab/private/{{ service.name }}.key:/etc/traefik/certs/{{ service.name }}.key:ro
+{% endfor %}
 
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.rule=Host(`gateway.lab`)"
       - "traefik.http.routers.traefik.entrypoints=websecure"
       - "traefik.http.routers.traefik.tls=true"
-      - "traefik.http.routers.traefik.tls.options=default@file"
+      - "traefik.http.routers.traefik.tls.options=default"
       - "traefik.http.services.traefik.loadbalancer.server.port=8080"
       - "traefik.http.services.traefik.loadbalancer.server.scheme=http"
 
@@ -86,7 +89,7 @@ services:
       - "traefik.http.services.adguard.loadbalancer.server.port=443"
       - "traefik.http.services.adguard.loadbalancer.server.scheme=https"
       - "traefik.http.services.adguard.loadbalancer.serverstransport=adguard-transport@file"
-      - "traefik.http.routers.adguard.tls.options=default@file"
+      - "traefik.http.routers.adguard.tls.options=default"
 
 networks:
   core_net:
