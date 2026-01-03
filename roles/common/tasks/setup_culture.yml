@@ -1,24 +1,36 @@
 - name: "Set Default Timezone"
   community.general.timezone:
     name: "{{ default_timezone }}"
+  tags:
+    - common
+    - essential
 
 - name: "Ensure Locales are generated"
   community.general.locale_gen:
     name: "{{ item }}"
     state: present
   loop: "{{ default_locales }}"
+  tags:
+    - common
+    - essential
 
 - name: "Check Current Locale"
   ansible.builtin.command: "localectl status"
   register: common_current_locale
   changed_when: false
   become: true
+  tags:
+    - common
+    - essential
 
 - name: "Set Default Locale"
   ansible.builtin.command: "localectl set-locale LANG={{ default_locale }}"
   become: true
   when: default_locale not in common_current_locale.stdout
   changed_when: true
+  tags:
+    - common
+    - essential
 
 - name: "Install NTP (Time Synchronization)"
   ansible.builtin.package:
@@ -26,6 +38,9 @@
     state: present
   when: ansible_service_mgr == "systemd"
   become: true
+  tags:
+    - common
+    - essential
 
 - name: "System: Enable NTP Synchronization"
   ansible.builtin.service:
@@ -34,3 +49,6 @@
     enabled: true
   when: ansible_service_mgr == "systemd"
   become: true
+  tags:
+    - common
+    - essential

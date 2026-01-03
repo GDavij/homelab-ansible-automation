@@ -1,0 +1,107 @@
+- name: "Disable System Suspend and Sleep"
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    masked: true
+    state: stopped
+  loop:
+    - sleep.target
+    - suspend.target
+    - hibernate.target
+    - hybrid-sleep.target
+  become: true
+  failed_when: false
+  tags:
+    - common
+    - essential
+
+- name: "Configure Logind to Handle Lid Close"
+  ansible.builtin.lineinfile:
+    path: /etc/systemd/logind.conf
+    regexp: "^#?{{ item.key }}="
+    line: "{{ item.key }}={{ item.value }}"
+    backup: true
+  loop:
+    - { key: "HandleLidSwitch", value: "ignore" }
+    - { key: "HandleLidSwitchExternalPower", value: "ignore" }
+    - { key: "HandleLidSwitchDocked", value: "ignore" }
+    - { key: "IdleAction", value: "ignore" }
+    - { key: "IdleActionSec", value: "0" }
+  become: true
+  notify: Restart systemd-logind
+  tags:
+    - common
+    - essential
+
+- name: "Ensure SSH Service is Always Running"
+  ansible.builtin.service:
+    name: "{{ common_ssh_service_name | default('ssh') }}"
+    state: started
+    enabled: true
+  become: true
+  tags:
+    - common
+    - essential
+
+- name: "Set SSH Service Name Based on OS"
+  ansible.builtin.set_fact:
+    common_ssh_service_name: >-
+      {{
+        'ssh'
+        if ansible_os_family == 'Debian'
+        else
+        'sshd'
+      }}
+  tags:
+    - common
+    - essential
+
+- name: "Configure SSH to Restart on Failure"
+  ansible.builtin.systemd:
+    name: "{{ common_ssh_service_name }}"
+    state: started
+    enabled: true
+    daemon_reload: true
+  become: true
+  tags:
+    - common
+    - essential
+
+- name: "Disable ACPI Sleep Events (if available)"
+  ansible.builtin.lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
+    line: 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"'
+    backup: true
+  become: true
+  notify: Update GRUB
+  when: ansible_os_family == "Debian"
+  tags:
+    - common
+    - essential
+
+- name: "Create Systemd Override Directory for SSH"
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ common_ssh_service_name }}.service.d"
+    state: directory
+    mode: '0755'
+  become: true
+  tags:
+    - common
+    - essential
+
+- name: "Configure SSH Service Override for High Availability"
+  ansible.builtin.copy:
+    content: |
+      [Service]
+      Restart=always
+      RestartSec=5
+      StartLimitInterval=0
+    dest: "/etc/systemd/system/{{ common_ssh_service_name }}.service.d/override.conf"
+    mode: '0644'
+  become: true
+  notify:
+    - Reload systemd
+    - Restart SSH service
+  tags:
+    - common
+    - essential

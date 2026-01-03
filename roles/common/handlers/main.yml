@@ -1,0 +1,22 @@
+- name: Restart systemd-logind
+  ansible.builtin.service:
+    name: systemd-logind
+    state: restarted
+  become: true
+
+- name: Update GRUB
+  ansible.builtin.command: update-grub
+  become: true
+  when: ansible_os_family == "Debian"
+  changed_when: true
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: true
+
+- name: Restart SSH service
+  ansible.builtin.service:
+    name: "{{ common_ssh_service_name | default('ssh') }}"
+    state: restarted
+  become: true

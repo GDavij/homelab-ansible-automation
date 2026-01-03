@@ -13,3 +13,9 @@
   tags:
     - common
     - packages
+
+- name: Setup Power Management
+  ansible.builtin.include_tasks:
+    file: setup_power_management.yml
+  tags:
+    - common
