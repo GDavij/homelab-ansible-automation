@@ -84,7 +84,7 @@ graph TB
 ```yaml
 # GhostTunnel sidecar configuration
 ghostunnel:
-  image: ghostunnel/ghostunnel:latest
+  image: ghostunnel/ghostunnel:v1.8.4-alpine
   container_name: app-name-sidecar
   network_mode: service:app-name  # Shares network stack with application
   command:
@@ -305,7 +305,7 @@ services:
       - ztn_tcp_labels
       
   upsnap-sidecar:
-    image: ghostunnel/ghostunnel:latest
+    image: ghostunnel/ghostunnel:v1.8.4-alpine
     container_name: upsnap-sidecar
     restart: unless-stopped
     network_mode: service:upsnap
@@ -335,7 +335,7 @@ services:
       {{ ztn_tcp_labels(service.name, service.dns, service.proxy_port) }}
       
   {{ service.name }}-sidecar:
-    image: ghostunnel/ghostunnel:latest
+    image: ghostunnel/ghostunnel:v1.8.4-alpine
     container_name: {{ service.name }}-sidecar
     restart: unless-stopped
     network_mode: service:{{ service.name }}
