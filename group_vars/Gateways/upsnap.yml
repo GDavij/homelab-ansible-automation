@@ -1,0 +1,38 @@
+# Upsnap Configuration for Wake-on-LAN Service
+# This file defines the machines that Upsnap will manage for Wake-on-LAN functionality
+
+# Upsnap Machines Configuration
+upsnap_machines:
+  - name: Monster
+    ip: 192.168.1.50  # Updated IP address for WoL functionality
+    mac: "11:11:11:11:11"  # (UPDATE)Monster Machine MAC address for Wake-on-LAN
+    ssh_key: "{{ ssh_keys_dir }}/monster/vanguard_id_ed25519"  # SSH key for remote power management
+    description: "Main workstation - Monster Machine"
+    username: vanguard  # SSH username for remote access
+    ssh_port: 22  # SSH port for remote management
+
+# Upsnap Application Configuration
+upsnap_config:
+  # Basic Upsnap settings (based on actual Upsnap capabilities)
+  web_port: 8090  # Web interface port
+  bind_address: "127.0.0.1"  # Bind to localhost for security
+  data_dir: "/app/data"  # PocketBase data directory
+
+  # Network scanning configuration (for initialization script)
+  scan_range: "192.168.1.0/24"  # Network range to scan
+
+  # SSH configuration for remote power management
+  ssh_timeout: 30  # SSH connection timeout in seconds
+
+  # Wake-on-LAN settings
+  wol_settings:
+    broadcast_address: "192.168.1.255"  # Network broadcast address for WoL packets
+    magic_packet_port: 9  # Standard WoL magic packet port (UDP port 9)
+
+  # Auto-discovery settings (for initialization and management)
+  auto_discovery:
+    enabled: true  # Enable automatic device discovery via API
+    initial_scan: true  # Perform initial network scan on startup
+    exclude_ips:  # IP addresses to exclude from scanning
+      - "192.168.1.1"   # Gateway
+      - "192.168.1.77"  # Bastion (self)

@@ -13,12 +13,13 @@ The architecture leverages the existing PKI infrastructure, Docker Compose patte
 ```mermaid
 graph TB
     Client[Client with Certificate] --> Traefik[Traefik Reverse Proxy]
-    Traefik --> |TCP with SNI| GT1[GhostTunnel Sidecar - Upsnap]
+    Traefik --> |TCP with SNI| GT1[GhostTunnel Host Network - Upsnap]
     Traefik --> |TCP with SNI| GT2[GhostTunnel Sidecar - Excalidraw]
     Traefik --> |TCP with SNI| GT3[GhostTunnel Sidecar - Memos]
     Traefik --> |TCP with SNI| GT4[GhostTunnel Sidecar - Maybe Finance]
     
-    GT1 -.-> |Shared Network Stack| App1[Upsnap Container]
+    GT1 --> |Host Network| App1[Upsnap Container]
+    GT1 --> |WoL Network Access| Monster[Monster Machine 192.168.1.50]
     GT2 -.-> |Shared Network Stack| App2[Excalidraw Container]
     GT3 -.-> |Shared Network Stack| App3[Memos Container]
     GT4 -.-> |Shared Network Stack| App4[Maybe Finance Container]
@@ -29,11 +30,23 @@ graph TB
     PKI --> |Server Certs| GT4
     PKI --> |Client Certs| Client
     
-    subgraph "Sidecar Pattern"
-        GT1 -.-> App1
+    Firewall[Firewalld Rules] --> |Blocks Direct HTTP| GT1
+    Firewall --> |Allows mTLS Only| GT1
+    
+    AdGuard[AdGuard - Existing Setup] --> |Already Working| DNS[DNS Services]
+    
+    subgraph "Host Network Pattern - Infrastructure"
+        GT1 --> App1
+    end
+    
+    subgraph "Sidecar Pattern - Applications"
         GT2 -.-> App2
         GT3 -.-> App3
         GT4 -.-> App4
+    end
+    
+    subgraph "Existing Infrastructure"
+        AdGuard --> DNS
     end
 ```
 
@@ -42,15 +55,21 @@ graph TB
 1. **Client Connection**: Clients connect with valid client certificates to Traefik
 2. **Traefik TCP Routing**: Traefik routes TCP connections based on SNI (Server Name Indication) 
 3. **GhostTunnel mTLS**: GhostTunnel validates client certificates and terminates TLS
-4. **Localhost Communication**: GhostTunnel forwards to applications on 127.0.0.1 within shared network stack
-5. **Application Response**: Applications respond through GhostTunnel's secure tunnel
+4. **Host Network Access (Upsnap)**: Upsnap GhostTunnel runs on host network for direct access to Monster Machine (192.168.1.50) for Wake-on-LAN
+5. **Localhost Communication (Apps)**: Application GhostTunnel sidecars forward to applications on 127.0.0.1 within shared network stack
+6. **Application Response**: Applications respond through GhostTunnel's secure tunnel
+7. **Firewall Protection**: Firewalld rules block direct HTTP access while allowing mTLS connections
+8. **Existing Services**: AdGuard continues to work with existing configuration (no changes needed)
 
 ### Security Layers
 
-1. **Network Stack Isolation**: Applications share network stack only with their GhostTunnel sidecar
+1. **Network Stack Isolation**: Application containers share network stack only with their GhostTunnel sidecar; Upsnap uses host network with firewall protection
 2. **mTLS Authentication**: GhostTunnel enforces client certificate validation
 3. **Certificate Authority Validation**: All certificates validated against homelab CA
-4. **Localhost-only Access**: Applications listen only on 127.0.0.1, accessible only via sidecar
+4. **Firewall Protection**: Firewalld rules block direct HTTP access to host network services (Upsnap only)
+5. **Localhost-only Access**: Sidecar applications listen only on 127.0.0.1, accessible only via sidecar
+6. **Host Network Security**: Upsnap on host network protected by firewall rules allowing only mTLS traffic
+7. **Existing Infrastructure**: AdGuard maintains current security configuration (no changes)
 
 ## Components and Interfaces
 
@@ -67,9 +86,44 @@ graph TB
 - **Default Configurations**: Services use default configurations with data persistence
 - **Independent Management**: Separate from core infrastructure services
 
-### GhostTunnel Sidecar Component
+### GhostTunnel Host Network Component (Upsnap Only)
 
-**Purpose**: Provides mTLS termination using the sidecar pattern with shared network stack
+**Purpose**: Provides mTLS termination using host network mode for Wake-on-LAN functionality
+
+**Configuration**:
+- **Mode**: Server mode (accepts TLS connections, forwards to localhost)
+- **Network Mode**: `host` - direct access to host network for WoL communication
+- **Listen Address**: 0.0.0.0:8443 (host network interface)
+- **Target Address**: 127.0.0.1:8090 (Upsnap application port)
+- **Server Certificate**: Service certificate from PKI infrastructure (upsnap.crt)
+- **CA Certificate**: Homelab root CA for client validation
+- **Access Control**: Client certificate validation
+- **Firewall Integration**: Protected by firewalld rules
+
+**Interface**:
+```yaml
+# GhostTunnel host network configuration (Upsnap only)
+upsnap-ghosttunnel:
+  image: ghostunnel/ghostunnel:v1.8.4-alpine
+  container_name: upsnap-ghosttunnel
+  network_mode: host  # Host network for WoL access
+  command:
+    - server
+    - --listen=0.0.0.0:8443
+    - --target=127.0.0.1:8090  # Upsnap application port
+    - --cert=/certs/upsnap.crt
+    - --key=/certs/upsnap.key
+    - --cacert=/certs/ca.crt
+    - --allow-all  # All valid client certs accepted
+  volumes:
+    - certificate_volumes
+  depends_on:
+    - upsnap
+```
+
+### GhostTunnel Sidecar Component (Applications)
+
+**Purpose**: Provides mTLS termination using the sidecar pattern with shared network stack (for non-infrastructure applications)
 
 **Configuration**:
 - **Mode**: Server mode (accepts TLS connections, forwards to localhost)
@@ -82,8 +136,8 @@ graph TB
 
 **Interface**:
 ```yaml
-# GhostTunnel sidecar configuration
-ghostunnel:
+# GhostTunnel sidecar configuration (Applications: Excalidraw, Memos, Maybe Finance)
+ghosttunnel:
   image: ghostunnel/ghostunnel:v1.8.4-alpine
   container_name: app-name-sidecar
   network_mode: service:app-name  # Shares network stack with application
@@ -91,8 +145,8 @@ ghostunnel:
     - server
     - --listen=0.0.0.0:8443
     - --target=127.0.0.1:8080  # Localhost communication
-    - --cert=/certs/server.crt
-    - --key=/certs/server.key
+    - --cert=/certs/app-name.crt  # Service name certificate
+    - --key=/certs/app-name.key
     - --cacert=/certs/ca.crt
     - --allow-all  # All valid client certs accepted
   volumes:
@@ -101,21 +155,50 @@ ghostunnel:
     - app-name
 ```
 
-### Application Container Component
+### Upsnap Container Component
 
-**Purpose**: Runs the target application with network stack shared with GhostTunnel sidecar
+**Purpose**: Runs Upsnap application with host network access for Wake-on-LAN functionality
 
 **Configuration**:
-- **Network Ownership**: Owns the network stack that GhostTunnel sidecar shares
-- **Network Membership**: Connected to proxy_net for Traefik service discovery
-- **Listen Address**: Application's native port (accessible only via localhost from sidecar)
-- **Port Exposure**: External port exposed through the shared network stack
-- **Data Persistence**: Application-specific volume mounts
-- **Network Security**: Only accessible via GhostTunnel sidecar on shared localhost
+- **Network Mode**: Bridge network for container isolation while allowing host network access via GhostTunnel
+- **Network Membership**: Connected to proxy_net for container management (not for Traefik discovery)
+- **Listen Address**: 127.0.0.1:8090 (localhost only, accessible via GhostTunnel)
+- **WoL Access**: Communicates with Monster Machine (192.168.1.50) via host network through GhostTunnel
+- **Data Persistence**: Upsnap configuration and database volumes
+- **Auto-configuration**: Pre-configured with homelab machines for WoL
+- **Traefik Integration**: Uses static configuration instead of Docker labels due to host network GhostTunnel
 
 **Interface**:
 ```yaml
-# Application container configuration (network stack owner)
+# Upsnap container configuration (infrastructure service)
+upsnap:
+  image: ghcr.io/seriousm4x/upsnap:5.2
+  container_name: upsnap
+  networks:
+    - proxy_net  # For container management, not Traefik discovery
+  volumes:
+    - /opt/core/upsnap:/app/data
+    - upsnap_config_template
+  # Application listens on 127.0.0.1:8090
+  # Accessible via GhostTunnel on host network at port 8443
+  # Traefik routes to 192.168.1.77:8443 via static configuration
+```
+
+### Application Container Component
+
+**Purpose**: Runs the target application with network stack shared with GhostTunnel sidecar (except Upsnap which uses separate networking)
+
+**Configuration**:
+- **Network Ownership**: Owns the network stack that GhostTunnel sidecar shares (for sidecar pattern apps)
+- **Network Membership**: Connected to proxy_net for Traefik service discovery
+- **Listen Address**: Application's native port (accessible only via localhost from sidecar)
+- **Port Exposure**: External port exposed through the shared network stack (sidecar apps) or via host network (Upsnap)
+- **Data Persistence**: Application-specific volume mounts
+- **Network Security**: Only accessible via GhostTunnel on shared localhost (sidecar) or protected by firewall (host network)
+
+**Interface**:
+```yaml
+# Application container configuration (network stack owner for sidecar pattern)
 application:
   image: application/image:latest
   container_name: app-name
@@ -127,6 +210,34 @@ application:
     - app_data:/app/data
   # Application listens on its native port (e.g., 8080, 5230, 3000)
   # but is only accessible via 127.0.0.1 from the sidecar
+```
+
+### Firewall Integration Component
+
+**Purpose**: Provides security layer for host network services by blocking direct HTTP access
+
+**Configuration**:
+- **mTLS Port Protection**: Allows only mTLS traffic on port 8443 for Upsnap
+- **HTTP Blocking**: Blocks direct HTTP access to Upsnap application port (8090)
+- **Service Integration**: Integrates with existing firewalld configuration
+- **Zone Configuration**: Uses appropriate firewall zones for host network services
+- **AdGuard Exclusion**: No changes to existing AdGuard firewall configuration
+
+**Interface**:
+```yaml
+# Firewall rules for host network GhostTunnel services
+firewall_rules:
+  # Upsnap mTLS access
+  - port: 8443/tcp
+    zone: public
+    state: enabled
+    description: "Upsnap mTLS access via GhostTunnel"
+  # Block direct HTTP access to Upsnap
+  - port: 8090/tcp
+    zone: public
+    state: disabled
+    description: "Block direct HTTP access to Upsnap"
+  # AdGuard - no changes (existing configuration maintained)
 ```
 
 ### PKI Integration Component
@@ -163,17 +274,33 @@ pki_services:
 
 ### Traefik Integration Component
 
-**Purpose**: Routes TCP traffic to GhostTunnel interfaces using SNI-based routing with extended label generation
+**Purpose**: Routes TCP traffic to GhostTunnel interfaces using SNI-based routing with hybrid configuration for host network services
 
 **Configuration**:
 - **TCP Routing**: Routes based on Server Name Indication (SNI)
-- **Service Discovery**: Extended ztn_labels macro for TCP service registration
+- **Hybrid Service Discovery**: Docker labels for sidecar services, static configuration for host network services
+- **Host Network Routing**: Static TCP router configuration for Upsnap (host network)
+- **Docker Network Routing**: Dynamic service discovery for application sidecars
 - **Health Checks**: Monitors GhostTunnel interface availability
 - **No TLS Termination**: Passes encrypted traffic directly to GhostTunnel
 
 **Interface**:
 ```yaml
-# Extended ztn_labels macro for TCP routing
+# Traefik static configuration for host network services (traefik-dynamic.yml)
+tcp:
+  routers:
+    upsnap-tcp:
+      rule: "HostSNI(`snap.lab`)"
+      service: upsnap-tcp-service
+      tls:
+        passthrough: true
+  services:
+    upsnap-tcp-service:
+      loadBalancer:
+        servers:
+          - address: "192.168.1.77:8443"  # Host IP and GhostTunnel port
+
+# Extended ztn_labels macro for TCP routing (Docker network services only)
 {% macro ztn_tcp_labels(name, dns, port=8443) -%}
 - "traefik.enable=true"
 - "traefik.tcp.routers.{{ name }}.rule=HostSNI(`{{ dns }}`)"
@@ -195,6 +322,7 @@ infra_ghosttunnel_services:
     app_image: ghcr.io/seriousm4x/upsnap:5.2
     app_port: 8090
     proxy_port: 8443
+    network_mode: host  # Host network for WoL access
     volumes:
       - /opt/core/upsnap:/app/data
     auto_config: true  # Auto-configure with homelab machines
@@ -237,7 +365,7 @@ apps_ghosttunnel_services:
 # group_vars/Gateways/upsnap.yml
 upsnap_machines:
   - name: Monster
-    ip: 192.168.1.90
+    ip: 192.168.1.50  # Updated to correct IP address
     mac: "aa:bb:cc:dd:ee:ff"
     ssh_key: "{{ ssh_keys_dir }}/monster_id_ed25519"
     description: "Main workstation"
@@ -249,34 +377,35 @@ upsnap_config:
   scan_range: "192.168.1.0/24"
   auto_discovery: true
   ssh_timeout: 30
+  host_network_access: true  # Enable host network access for WoL
 ```
 
 ### Certificate Configuration Model
 
 ```yaml
-# Extended PKI services for GhostTunnel proxy certificates only
+# Extended PKI services for GhostTunnel proxy certificates
 pki_services:
-  # Existing services (adguard, traefik, etc.)...
+  # Existing services (traefik, adguard, etc.)...
   
-  # GhostTunnel proxy certificates (applications themselves don't need PKI)
-  - name: upsnap-proxy
+  # GhostTunnel certificates using service names (not proxy names)
+  - name: upsnap
     dns: snap.lab
-    description: Upsnap GhostTunnel Proxy Certificate
+    description: Upsnap GhostTunnel Certificate
     ip: 192.168.1.77
     
-  - name: excalidraw-proxy
+  - name: excalidraw
     dns: draw.lab
-    description: Excalidraw GhostTunnel Proxy Certificate
+    description: Excalidraw GhostTunnel Certificate
     ip: 192.168.1.77
     
-  - name: memos-proxy
+  - name: memos
     dns: daily.lab
-    description: Memos GhostTunnel Proxy Certificate
+    description: Memos GhostTunnel Certificate
     ip: 192.168.1.77
     
-  - name: maybe-finance-proxy
+  - name: maybe-finance
     dns: finance.lab
-    description: Maybe Finance GhostTunnel Proxy Certificate
+    description: Maybe Finance GhostTunnel Certificate
     ip: 192.168.1.77
 ```
 
@@ -287,31 +416,28 @@ pki_services:
 
 ## infra_gateways role - Core services (extends existing infra_services.compose.j2)
 services:
-  # Existing services (gateway, dns)...
+  # Existing services (gateway, traefik, adguard)...
   
-  # Upsnap core infrastructure service
+  # Upsnap infrastructure service (no Traefik labels - uses static config)
   upsnap:
     image: ghcr.io/seriousm4x/upsnap:5.2
     container_name: upsnap
     restart: unless-stopped
     networks:
       - proxy_net
-    ports:
-      - "8443:8443"
     volumes:
       - /opt/core/upsnap:/app/data
       - upsnap_config_template
-    labels:
-      - ztn_tcp_labels
+    # No Traefik labels - host network GhostTunnel uses static configuration
       
-  upsnap-sidecar:
+  upsnap-ghosttunnel:
     image: ghostunnel/ghostunnel:v1.8.4-alpine
-    container_name: upsnap-sidecar
+    container_name: upsnap-ghosttunnel
     restart: unless-stopped
-    network_mode: service:upsnap
+    network_mode: host  # Host network for WoL access
     volumes:
       - certificate_volumes
-    command: [server, --listen, --target=127.0.0.1:8090, --cert, --key, --cacert, --allow-all]
+    command: [server, --listen=0.0.0.0:8443, --target=127.0.0.1:8090, --cert=/certs/upsnap.crt, --key=/certs/upsnap.key, --cacert=/certs/ca.crt, --allow-all]
     depends_on:
       - upsnap
 

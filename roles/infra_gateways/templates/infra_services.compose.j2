@@ -92,6 +92,85 @@ services:
       - "traefik.http.services.adguard.loadbalancer.serverstransport=adguard-transport@file"
       - "traefik.http.routers.adguard.tls.options=default"
 
+  upsnap:
+    image: ghcr.io/seriousm4x/upsnap:5.2
+    container_name: upsnap
+    restart: unless-stopped
+    network_mode: host  # Host network required for Wake-on-LAN functionality
+    
+    command:
+      - "./upsnap"
+      - "serve"
+      - "--http={{ upsnap_config.bind_address }}:{{ upsnap_config.web_port }}"
+    
+    volumes:
+      - /opt/core/upsnap:/app/data
+      - /opt/core/upsnap/init-script.sh:/app/init-script.sh:ro
+{% for machine in upsnap_machines %}
+{% if machine.ssh_key is defined %}
+      - {{ machine.ssh_key }}:/app/ssh-keys/{{ machine.name | lower }}_id_ed25519:ro
+{% endif %}
+{% endfor %}
+    
+    environment:
+      # Upsnap configuration via environment variables
+      - UPSNAP_HTTP_BIND={{ upsnap_config.bind_address }}:{{ upsnap_config.web_port }}
+      - UPSNAP_DATA_DIR=/app/data
+      - UPSNAP_SCAN_RANGE={{ upsnap_config.scan_range }}
+      - UPSNAP_SSH_TIMEOUT={{ upsnap_config.ssh_timeout }}
+      - UPSNAP_WOL_BROADCAST={{ upsnap_config.wol_settings.broadcast_address }}
+      - UPSNAP_WOL_PORT={{ upsnap_config.wol_settings.magic_packet_port }}
+    
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://{{ upsnap_config.bind_address }}:{{ upsnap_config.web_port }}/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Host network mode enables Wake-on-LAN magic packet transmission
+    # No Traefik labels - uses static configuration for host network GhostTunnel
+    # Access via GhostTunnel proxy on host network at port 8443
+
+  upsnap-ghosttunnel:
+    image: ghostunnel/ghostunnel:v1.8.4-alpine
+    container_name: upsnap-ghosttunnel
+    restart: unless-stopped
+    network_mode: host  # Host network for mTLS proxy access
+    
+    command:
+      - "server"
+      - "--listen=0.0.0.0:8443"
+      - "--target={{ upsnap_config.bind_address }}:{{ upsnap_config.web_port }}"
+      - "--cert=/certs/upsnap.crt"
+      - "--key=/certs/upsnap.key"
+      - "--cacert=/certs/ca.crt"
+      - "--allow-all"
+    
+    volumes:
+      # Server certificate and private key for mTLS
+      - /etc/pki/homelab/certs/upsnap.crt:/certs/upsnap.crt:ro
+      - /etc/pki/homelab/private/upsnap.key:/certs/upsnap.key:ro
+      # CA certificate for client certificate validation
+      - /etc/pki/homelab/certs/root-ca.crt:/certs/ca.crt:ro
+    
+    # Security: Run as non-root user for better security
+    user: "65534:65534"  # nobody:nobody
+    
+    depends_on:
+      - upsnap
+    
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "8443"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    
+    # GhostTunnel mTLS proxy for Upsnap on host network
+    # Provides secure access to Upsnap via client certificates
+    # Accessible via Traefik static configuration at snap.lab:8443
+
 networks:
   core_net:
     external: true

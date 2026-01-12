@@ -23,6 +23,22 @@ http:
         readIdleTimeout: 60s
 {% endfor %}
 
+tcp:
+  routers:
+    # Static TCP router for host network GhostTunnel services
+    upsnap-tcp:
+      rule: "HostSNI(`snap.lab`)"
+      service: upsnap-tcp-service
+      tls:
+        passthrough: true
+  
+  services:
+    # Static TCP service for host network GhostTunnel
+    upsnap-tcp-service:
+      loadBalancer:
+        servers:
+          - address: "192.168.1.77:8443"  # Host IP and GhostTunnel port
+
 tls:
   certificates:
 {% for service in pki_services %}

@@ -61,8 +61,8 @@
         state_or_province_name: "{{ pki_ca_state }}"
         locality_name: "{{ pki_ca_locality }}"
 
-        # Subject Alt Name(SANs)
-        subject_alt_name: "DNS:{{ service.dns }}"
+        # Subject Alt Name(SANs) - Include both DNS and IP for GhostTunnel compatibility
+        subject_alt_name: "DNS:{{ service.dns }},IP:{{ service.ip }}"
 
         # Critical extensions for browser trust
         key_usage:
