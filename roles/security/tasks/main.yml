@@ -53,6 +53,22 @@
   loop: "{{ system_users }}"
   loop_control:
     label: "{{ item.username }}"
+  when: item.sudo_commands is not defined
+
+- name: Grant Restricted Sudo Permissions
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers.d/{{ item.username }}
+    line: "{{ item.username }} ALL=(ALL) NOPASSWD: {{ item.sudo_commands }}"
+    create: true
+    mode: "0440"
+    owner: root
+    group: root
+    state: present
+  become: true
+  loop: "{{ system_users }}"
+  loop_control:
+    label: "{{ item.username }}"
+  when: item.sudo_commands is defined
 
 - name: Inject User Keys
   ansible.posix.authorized_key:

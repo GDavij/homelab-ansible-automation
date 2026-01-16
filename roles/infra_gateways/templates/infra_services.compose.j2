@@ -105,12 +105,7 @@ services:
     
     volumes:
       - /opt/core/upsnap:/app/data
-      - /opt/core/upsnap/init-script.sh:/app/init-script.sh:ro
-{% for machine in upsnap_machines %}
-{% if machine.ssh_key is defined %}
-      - {{ machine.ssh_key }}:/app/ssh-keys/{{ machine.name | lower }}_id_ed25519:ro
-{% endif %}
-{% endfor %}
+      - /home/vanguard/.ssh:/ssh:ro  # SSH keys from vanguard user for remote shutdown/reboot
     
     environment:
       # Upsnap configuration via environment variables

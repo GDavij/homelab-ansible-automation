@@ -4,6 +4,86 @@
 # ALLOWS: Network -> Traefik -> Upsnap Proxy -> Upsnap
 # BLOCKS: Network -> Upsnap Proxy (direct), Network -> Upsnap (direct)
 
+# IMPORTANT: Rules are processed in order. Accept rules must come BEFORE reject rules.
+# Apply rules to: underlay_network (physical) and ztn_network (Tailscale)
+
+# ============================================================================
+# STEP 1: Remove existing Upsnap rules to ensure correct order
+# ============================================================================
+
+- name: Remove existing Upsnap rules from underlay_network zone
+  ansible.posix.firewalld:
+    zone: underlay_network
+    rich_rule: "{{ item }}"
+    state: disabled
+    permanent: true
+    immediate: true
+  loop:
+    - 'rule family="ipv4" source address="172.20.0.0/24" port port="8443" protocol="tcp" accept'
+    - 'rule family="ipv4" source address="172.21.0.0/24" port port="8443" protocol="tcp" accept'
+    - 'rule family="ipv4" port port="8443" protocol="tcp" reject'
+    - 'rule family="ipv4" port port="8090" protocol="tcp" reject'
+  failed_when: false
+  become: true
+  tags:
+    - infra_gateways
+    - upsnap
+    - firewall
+
+- name: Remove existing Upsnap rules from ztn_network zone
+  ansible.posix.firewalld:
+    zone: ztn_network
+    rich_rule: "{{ item }}"
+    state: disabled
+    permanent: true
+    immediate: true
+  loop:
+    - 'rule family="ipv4" source address="172.20.0.0/24" port port="8443" protocol="tcp" accept'
+    - 'rule family="ipv4" source address="172.21.0.0/24" port port="8443" protocol="tcp" accept'
+    - 'rule family="ipv4" port port="8443" protocol="tcp" reject'
+    - 'rule family="ipv4" port port="8090" protocol="tcp" reject'
+  failed_when: false
+  become: true
+  tags:
+    - infra_gateways
+    - upsnap
+    - firewall
+
+# ============================================================================
+# STEP 2: Add rules in CORRECT order (ACCEPT before REJECT)
+# ============================================================================
+
+# UNDERLAY NETWORK ZONE (Physical Network Interface)
+# ============================================================================
+
+- name: Allow Traefik to access Upsnap proxy (8443) from Docker core network on underlay
+  ansible.posix.firewalld:
+    zone: underlay_network
+    rich_rule: 'rule family="ipv4" source address="172.20.0.0/24" port port="8443" protocol="tcp" accept'
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  notify: Reload_firewalld
+  tags:
+    - infra_gateways
+    - upsnap
+    - firewall
+
+- name: Allow Traefik to access Upsnap proxy (8443) from Docker proxy network on underlay
+  ansible.posix.firewalld:
+    zone: underlay_network
+    rich_rule: 'rule family="ipv4" source address="172.21.0.0/24" port port="8443" protocol="tcp" accept'
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  notify: Reload_firewalld
+  tags:
+    - infra_gateways
+    - upsnap
+    - firewall
+
 - name: Block direct access to Upsnap mTLS proxy (8443) on underlay network
   ansible.posix.firewalld:
     zone: underlay_network
@@ -32,9 +112,13 @@
     - upsnap
     - firewall
 
-- name: Allow Traefik to access Upsnap proxy (8443) from Docker networks
+# ============================================================================
+# ZTN NETWORK ZONE (Tailscale Interface - tailscale0)
+# ============================================================================
+
+- name: Allow Traefik to access Upsnap proxy (8443) from Docker core network on ZTN
   ansible.posix.firewalld:
-    zone: underlay_network
+    zone: ztn_network
     rich_rule: 'rule family="ipv4" source address="172.20.0.0/24" port port="8443" protocol="tcp" accept'
     state: enabled
     permanent: true
@@ -46,9 +130,9 @@
     - upsnap
     - firewall
 
-- name: Allow Traefik to access Upsnap proxy (8443) from proxy network
+- name: Allow Traefik to access Upsnap proxy (8443) from Docker proxy network on ZTN
   ansible.posix.firewalld:
-    zone: underlay_network
+    zone: ztn_network
     rich_rule: 'rule family="ipv4" source address="172.21.0.0/24" port port="8443" protocol="tcp" accept'
     state: enabled
     permanent: true
@@ -60,7 +144,7 @@
     - upsnap
     - firewall
 
-- name: Block direct access to Upsnap mTLS proxy (8443) on ZTN network (if exists)
+- name: Block direct access to Upsnap mTLS proxy (8443) on ZTN network
   ansible.posix.firewalld:
     zone: ztn_network
     rich_rule: 'rule family="ipv4" port port="8443" protocol="tcp" reject'
@@ -68,14 +152,13 @@
     permanent: true
     immediate: true
   become: true
-  failed_when: false  # Zone might not exist if Tailscale is not configured
   notify: Reload_firewalld
   tags:
     - infra_gateways
     - upsnap
     - firewall
 
-- name: Block direct HTTP access to Upsnap (8090) on ZTN network (if exists)
+- name: Block direct HTTP access to Upsnap (8090) on ZTN network
   ansible.posix.firewalld:
     zone: ztn_network
     rich_rule: 'rule family="ipv4" port port="8090" protocol="tcp" reject'
@@ -83,7 +166,6 @@
     permanent: true
     immediate: true
   become: true
-  failed_when: false  # Zone might not exist if Tailscale is not configured
   notify: Reload_firewalld
   tags:
     - infra_gateways

@@ -37,6 +37,7 @@
     - /opt/core/traefik/certs
     - /opt/core/traefik/dynamic
     - /opt/core/upsnap
+    - /opt/core/upsnap/ssh_keys
     - /composes
   tags:
     - infra_gateways
@@ -71,16 +72,6 @@
   tags:
     - infra_gateways
 
-- name: Deploy Upsnap initialization script
-  ansible.builtin.template:
-    src: templates/upsnap-init.sh.j2
-    dest: /opt/core/upsnap/init-script.sh
-    mode: '0755'
-  become: true
-  tags:
-    - infra_gateways
-    - upsnap
-
 - name: Configure Upsnap firewall rules
   ansible.builtin.include_tasks:
     file: upsnap-firewall.yml
@@ -98,36 +89,7 @@
     project_name: infra_core_services
     pull: missing
     remove_orphans: true
-    recreate: always
+    recreate: auto  # Recreate only when compose config changes (preserves data)
   become: true
   tags:
     - infra_gateways
-
-- name: Wait for Upsnap container to be ready
-  ansible.builtin.wait_for:
-    host: "{{ upsnap_config.bind_address }}"
-    port: "{{ upsnap_config.web_port }}"
-    delay: 10
-    timeout: 120
-  tags:
-    - infra_gateways
-    - upsnap
-
-- name: Execute Upsnap initialization script
-  ansible.builtin.command:
-    cmd: /opt/core/upsnap/init-script.sh
-  become: true
-  register: upsnap_init_result
-  changed_when: "'Successfully added device' in upsnap_init_result.stdout"
-  failed_when: upsnap_init_result.rc != 0
-  tags:
-    - infra_gateways
-    - upsnap
-
-- name: Display Upsnap initialization results
-  ansible.builtin.debug:
-    var: upsnap_init_result.stdout_lines
-  when: upsnap_init_result is defined
-  tags:
-    - infra_gateways
-    - upsnap

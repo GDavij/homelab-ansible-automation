@@ -13,6 +13,12 @@ system_users:
     groups: sudo,docker,ssl-cert
     shell: /bin/bash
     state: present
+  - username: upsnap # Up Snap Specific User that can just poweroff or reboot the computer nothing more.
+    groups: ""  # No groups - restricted user
+    shell: /bin/bash
+    state: present
+    comment: "Upsnap service user - restricted to poweroff only"
+    sudo_commands: "/usr/sbin/poweroff, /usr/sbin/reboot"  # Only allow poweroff and reboot
 
 # SSL Certificate Group
 ssl_cert_group: docker

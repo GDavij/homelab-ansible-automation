@@ -36,7 +36,7 @@
     - tailscale
     - firewalld
 
-- name: Enable Masquerede on ZTN Zone
+- name: Enable Masquerade on ZTN Zone
   ansible.posix.firewalld:
     zone: ztn_network
     masquerade: true
@@ -44,6 +44,25 @@
     permanent: true
     immediate: true
   become: true
+  tags:
+    - tailscale
+    - firewalld
+
+- name: Enable Forwarding on ZTN Zone (for subnet routing)
+  ansible.builtin.command:
+    cmd: firewall-cmd --zone=ztn_network --set-target=ACCEPT --permanent
+  become: true
+  changed_when: true
+  notify: Reload_firewalld
+  tags:
+    - tailscale
+    - firewalld
+
+- name: Enable Forwarding on ZTN Zone (immediate)
+  ansible.builtin.command:
+    cmd: firewall-cmd --zone=ztn_network --set-target=ACCEPT
+  become: true
+  changed_when: true
   tags:
     - tailscale
     - firewalld
