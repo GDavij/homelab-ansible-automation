@@ -2,14 +2,14 @@
 
 ## Introduction
 
-This specification defines the implementation of homelab applications secured with mutual TLS (mTLS) authentication using GhostTunnel as a proxy layer. The system will deploy containerized applications (Upsnap, Excalidraw, Memos, Maybe Finance) behind GhostTunnel proxies that enforce client certificate authentication, providing enterprise-grade security for internal homelab services.
+This specification defines the implementation of homelab applications secured with mutual TLS (mTLS) authentication using GhostTunnel as a proxy layer. The system will deploy containerized applications (Upsnap, Memos, Maybe Finance, Trilium) behind GhostTunnel proxies that enforce client certificate authentication, providing enterprise-grade security for internal homelab services.
 
 ## Glossary
 
 - **GhostTunnel**: A simple TLS proxy with mutual authentication support for securing connections
 - **mTLS**: Mutual Transport Layer Security - bidirectional authentication where both client and server verify each other's certificates
 - **Homelab_System**: The Ansible-managed infrastructure automation system for homelab environments
-- **Application_Container**: Docker containers running the target applications (Upsnap, Excalidraw, Memos, Maybe Finance)
+- **Application_Container**: Docker containers running the target applications (Upsnap, Memos, Maybe Finance, Trilium)
 - **PKI_Infrastructure**: The existing Public Key Infrastructure for certificate generation and management
 - **Service_Discovery**: Traefik-based reverse proxy system for routing and load balancing
 - **Client_Certificate**: X.509 certificates issued to clients for mTLS authentication
@@ -79,18 +79,6 @@ This specification defines the implementation of homelab applications secured wi
 4. WHEN external clients connect to Upsnap, THE GhostTunnel SHALL enforce client certificate authentication
 5. WHEN authentication succeeds, THE GhostTunnel SHALL proxy requests to the backend Upsnap container
 
-### Requirement 5
-
-**User Story:** As a homelab administrator, I want to deploy Excalidraw application with mTLS security, so that collaborative drawing sessions are protected from unauthorized access.
-
-#### Acceptance Criteria
-
-1. WHEN deploying Excalidraw, THE Homelab_System SHALL create an Excalidraw Application_Container listening on localhost
-2. WHEN configuring Excalidraw proxy, THE Homelab_System SHALL deploy a GhostTunnel container forwarding to the Excalidraw container
-3. WHEN Excalidraw GhostTunnel starts, THE GhostTunnel SHALL bind to the configured port with mTLS enabled
-4. WHEN external clients connect to Excalidraw, THE GhostTunnel SHALL enforce client certificate authentication
-5. WHEN authentication succeeds, THE GhostTunnel SHALL proxy requests to the backend Excalidraw container
-
 ### Requirement 6
 
 **User Story:** As a homelab administrator, I want to deploy Memos application with mTLS security, so that personal note-taking functionality is protected from unauthorized access.
@@ -117,6 +105,18 @@ This specification defines the implementation of homelab applications secured wi
 
 ### Requirement 8
 
+**User Story:** As a homelab administrator, I want to deploy Trilium application with mTLS security, so that personal knowledge base and note-taking functionality is protected from unauthorized access.
+
+#### Acceptance Criteria
+
+1. WHEN deploying Trilium, THE Homelab_System SHALL create a Trilium Application_Container listening on localhost
+2. WHEN configuring Trilium proxy, THE Homelab_System SHALL deploy a GhostTunnel container forwarding to the Trilium container
+3. WHEN Trilium GhostTunnel starts, THE GhostTunnel SHALL bind to the configured port with mTLS enabled
+4. WHEN external clients connect to Trilium, THE GhostTunnel SHALL enforce client certificate authentication
+5. WHEN authentication succeeds, THE GhostTunnel SHALL proxy requests to the backend Trilium container
+
+### Requirement 9
+
 **User Story:** As a homelab administrator, I want to integrate GhostTunnel services with Traefik service discovery, so that applications remain accessible through the existing reverse proxy infrastructure.
 
 #### Acceptance Criteria
@@ -127,7 +127,7 @@ This specification defines the implementation of homelab applications secured wi
 4. WHEN health checks occur, THE Service_Discovery SHALL verify GhostTunnel proxy availability
 5. WHEN GhostTunnel services become unavailable, THE Service_Discovery SHALL remove them from routing tables
 
-### Requirement 9
+### Requirement 10
 
 **User Story:** As a homelab administrator, I want to extend the existing all.yml configuration with GhostTunnel-specific variables, so that certificate generation and service configuration follows the established patterns.
 

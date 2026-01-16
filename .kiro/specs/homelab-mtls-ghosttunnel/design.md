@@ -2,7 +2,7 @@
 
 ## Overview
 
-This design implements a comprehensive mTLS security layer for homelab applications using GhostTunnel as a proxy layer. The system extends the existing Ansible-managed infrastructure to deploy containerized applications (Upsnap, Excalidraw, Memos, Maybe Finance) behind GhostTunnel proxies that enforce mutual TLS authentication.
+This design implements a comprehensive mTLS security layer for homelab applications using GhostTunnel as a proxy layer. The system extends the existing Ansible-managed infrastructure to deploy containerized applications (Upsnap, Memos, Maybe Finance, Trilium) behind GhostTunnel proxies that enforce mutual TLS authentication.
 
 The architecture leverages the existing PKI infrastructure, Docker Compose patterns, and Traefik service discovery while integrating GhostTunnel as the primary network interface for applications. Applications communicate through GhostTunnel containers that handle all external network access, providing mTLS termination and secure tunneling. Applications do not expose ports directly - instead, they communicate with GhostTunnel over internal container networks.
 
@@ -14,20 +14,20 @@ The architecture leverages the existing PKI infrastructure, Docker Compose patte
 graph TB
     Client[Client with Certificate] --> Traefik[Traefik Reverse Proxy]
     Traefik --> |TCP with SNI| GT1[GhostTunnel Host Network - Upsnap]
-    Traefik --> |TCP with SNI| GT2[GhostTunnel Sidecar - Excalidraw]
     Traefik --> |TCP with SNI| GT3[GhostTunnel Sidecar - Memos]
     Traefik --> |TCP with SNI| GT4[GhostTunnel Sidecar - Maybe Finance]
+    Traefik --> |TCP with SNI| GT5[GhostTunnel Sidecar - Trilium]
     
     GT1 --> |Host Network| App1[Upsnap Container]
     GT1 --> |WoL Network Access| Monster[Monster Machine 192.168.1.50]
-    GT2 -.-> |Shared Network Stack| App2[Excalidraw Container]
     GT3 -.-> |Shared Network Stack| App3[Memos Container]
     GT4 -.-> |Shared Network Stack| App4[Maybe Finance Container]
+    GT5 -.-> |Shared Network Stack| App5[Trilium Container]
     
     PKI[PKI Infrastructure] --> |Server Certs| GT1
-    PKI --> |Server Certs| GT2
     PKI --> |Server Certs| GT3
     PKI --> |Server Certs| GT4
+    PKI --> |Server Certs| GT5
     PKI --> |Client Certs| Client
     
     Firewall[Firewalld Rules] --> |Blocks Direct HTTP| GT1
@@ -40,9 +40,9 @@ graph TB
     end
     
     subgraph "Sidecar Pattern - Applications"
-        GT2 -.-> App2
         GT3 -.-> App3
         GT4 -.-> App4
+        GT5 -.-> App5
     end
     
     subgraph "Existing Infrastructure"
@@ -81,7 +81,7 @@ graph TB
 - **Core Integration**: Leverages existing ztn_labels macro and certificate management
 
 **apps_gateways Role (New)**:
-- **Application Services**: Excalidraw, Memos, Maybe Finance
+- **Application Services**: Memos, Maybe Finance, Trilium
 - **Standardized Deployment**: Consistent sidecar pattern across all applications
 - **Default Configurations**: Services use default configurations with data persistence
 - **Independent Management**: Separate from core infrastructure services
@@ -136,7 +136,7 @@ upsnap-ghosttunnel:
 
 **Interface**:
 ```yaml
-# GhostTunnel sidecar configuration (Applications: Excalidraw, Memos, Maybe Finance)
+# GhostTunnel sidecar configuration (Applications: Memos, Maybe Finance, Trilium)
 ghosttunnel:
   image: ghostunnel/ghostunnel:v1.8.4-alpine
   container_name: app-name-sidecar
@@ -329,15 +329,6 @@ infra_ghosttunnel_services:
 
 # apps_gateways role - Application services
 apps_ghosttunnel_services:
-  - name: excalidraw
-    dns: draw.lab
-    description: Collaborative Drawing
-    app_image: excalidraw/excalidraw:latest
-    app_port: 80
-    proxy_port: 8443
-    volumes: []
-    auto_config: false  # Use default configuration
-    
   - name: memos
     dns: daily.lab
     description: Note-taking Service
@@ -356,6 +347,16 @@ apps_ghosttunnel_services:
     proxy_port: 8443
     volumes:
       - /opt/apps/maybe:/app/data
+    auto_config: false  # Use default configuration
+    
+  - name: trilium
+    dns: notes.lab
+    description: Personal Knowledge Base
+    app_image: triliumnext/trilium:stable
+    app_port: 8080
+    proxy_port: 8443
+    volumes:
+      - /opt/apps/trilium:/home/node/trilium-data
     auto_config: false  # Use default configuration
 ```
 
@@ -393,11 +394,6 @@ pki_services:
     description: Upsnap GhostTunnel Certificate
     ip: 192.168.1.77
     
-  - name: excalidraw
-    dns: draw.lab
-    description: Excalidraw GhostTunnel Certificate
-    ip: 192.168.1.77
-    
   - name: memos
     dns: daily.lab
     description: Memos GhostTunnel Certificate
@@ -406,6 +402,11 @@ pki_services:
   - name: maybe-finance
     dns: finance.lab
     description: Maybe Finance GhostTunnel Certificate
+    ip: 192.168.1.77
+    
+  - name: trilium
+    dns: notes.lab
+    description: Trilium GhostTunnel Certificate
     ip: 192.168.1.77
 ```
 
@@ -522,7 +523,7 @@ networks:
 
 **Property 9: Application sidecar network isolation**
 *For any* application in the ghosttunnel_services configuration, the application container should share its network stack only with its GhostTunnel sidecar and be accessible only via localhost (127.0.0.1) from the sidecar
-**Validates: Requirements 3.1, 4.1, 5.1, 6.1**
+**Validates: Requirements 3.1, 4.1, 5.1, 6.1, 7.1, 8.1**
 
 **Property 10: Service discovery TCP label configuration**
 *For any* GhostTunnel container, the container should be configured with appropriate Docker labels for Traefik TCP routing with SNI-based service discovery
