@@ -88,11 +88,6 @@
   - Set up tasks, templates, and handlers directories
   - _Requirements: 5.1, 6.1, 7.1_
 
-- [ ] 17. Create apps_gateways role directory structure
-  - Create new apps_gateways role directory structure
-  - Set up tasks, templates, and handlers directories
-  - _Requirements: 5.1, 6.1, 7.1_
-
 - [ ] 18. Implement apps_gateways main task orchestration
   - Implement main.yml task orchestration
   - Configure task includes and role dependencies

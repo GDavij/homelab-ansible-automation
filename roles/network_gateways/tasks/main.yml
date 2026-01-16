@@ -15,12 +15,6 @@
    gather_subset: network
   become: true
 
-- name: Trust Network Interfaces
-  ansible.builtin.include_tasks:
-   file: trust-external-interfaces.yml
-  tags:
-   - network_gateways
-
 - name: Configure Firewall Rules
   ansible.builtin.include_tasks:
    file: firewall-policies.yml
