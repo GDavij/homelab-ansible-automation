@@ -33,6 +33,14 @@ services:
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
+      # Security disabled for Trillium Notes usage
+      - "--entrypoints.websecure.http.encodedCharacters.allowEncodedSlash=true"
+      - "--entrypoints.websecure.http.encodedCharacters.allowEncodedBackSlash=true"
+      - "--entrypoints.websecure.http.encodedCharacters.allowEncodedNullCharacter=true"
+      - "--entrypoints.websecure.http.encodedCharacters.allowEncodedSemicolon=true"
+      - "--entrypoints.websecure.http.encodedCharacters.allowEncodedPercent=true"
+      - "--entrypoints.websecure.http.encodedCharacters.allowEncodedQuestionMark=true"
+      - "--entrypoints.websecure.http.encodedCharacters.allowEncodedHash=true"
       - "--api.dashboard=true"
       - "--api.insecure=false"
       - "--log.level=INFO"
@@ -104,13 +112,12 @@ services:
       - "--http={{ upsnap_config.bind_address }}:{{ upsnap_config.web_port }}"
     
     volumes:
-      - /opt/core/upsnap:/app/data
+      - /opt/core/upsnap:/app/pb_data  # Fixed: Upsnap stores data in /app/pb_data by default
       - /home/vanguard/.ssh:/ssh:ro  # SSH keys from vanguard user for remote shutdown/reboot
     
     environment:
       # Upsnap configuration via environment variables
       - UPSNAP_HTTP_BIND={{ upsnap_config.bind_address }}:{{ upsnap_config.web_port }}
-      - UPSNAP_DATA_DIR=/app/data
       - UPSNAP_SCAN_RANGE={{ upsnap_config.scan_range }}
       - UPSNAP_SSH_TIMEOUT={{ upsnap_config.ssh_timeout }}
       - UPSNAP_WOL_BROADCAST={{ upsnap_config.wol_settings.broadcast_address }}
@@ -122,6 +129,9 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    
+    labels:
+      - "traefik.enable=false"  # Disable Traefik for host network container
     
     # Host network mode enables Wake-on-LAN magic packet transmission
     # No Traefik labels - uses static configuration for host network GhostTunnel
@@ -161,6 +171,9 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    
+    labels:
+      - "traefik.enable=false"  # Disable Traefik for host network container
     
     # GhostTunnel mTLS proxy for Upsnap on host network
     # Provides secure access to Upsnap via client certificates

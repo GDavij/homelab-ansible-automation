@@ -1,0 +1,262 @@
+{% macro ztn_http_labels(name, dns, port=8443) -%}
+      - "traefik.enable=true"
+      - "traefik.http.routers.{{ name }}.rule=Host(`{{ dns }}`)"
+      - "traefik.http.routers.{{ name }}.entrypoints=websecure"
+      - "traefik.http.routers.{{ name }}.tls=true"
+      - "traefik.http.routers.{{ name }}.tls.options=default"
+      - "traefik.http.services.{{ name }}.loadbalancer.server.port={{ port }}"
+      - "traefik.http.services.{{ name }}.loadbalancer.server.scheme=https"
+      - "traefik.http.services.{{ name }}.loadbalancer.serverstransport={{ name }}-transport@file"
+{%- endmacro %}
+
+{% macro ztn_http_labels_with_middleware(name, dns, port=8443, middleware='') -%}
+      - "traefik.enable=true"
+      - "traefik.http.routers.{{ name }}.rule=Host(`{{ dns }}`)"
+      - "traefik.http.routers.{{ name }}.entrypoints=websecure"
+      - "traefik.http.routers.{{ name }}.tls=true"
+      - "traefik.http.routers.{{ name }}.tls.options=default"
+      - "traefik.http.routers.{{ name }}.middlewares={{ middleware }}@file"
+      - "traefik.http.services.{{ name }}.loadbalancer.server.port={{ port }}"
+      - "traefik.http.services.{{ name }}.loadbalancer.server.scheme=https"
+      - "traefik.http.services.{{ name }}.loadbalancer.serverstransport={{ name }}-transport@file"
+{%- endmacro %}
+
+{% macro ztn_tcp_labels(name, dns, port=8443) -%}
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.{{ name }}.rule=HostSNI(`{{ dns }}`)"
+      - "traefik.tcp.routers.{{ name }}.entrypoints=websecure"
+      - "traefik.tcp.routers.{{ name }}.tls.passthrough=true"
+      - "traefik.tcp.services.{{ name }}.loadbalancer.server.port={{ port }}"
+{%- endmacro %}
+
+# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-go/master/schema/compose-spec.json
+
+services:
+  # Memos - Note-taking Service
+  memos:
+    image: neosmemo/memos:stable
+    container_name: memos
+    restart: unless-stopped
+    networks:
+      - proxy_net
+    volumes:
+      - /opt/apps/memos:/var/opt/memos
+    labels:
+      {{ ztn_http_labels('memos', 'daily.lab', 8443) }}
+    # Application listens on port 5230 internally
+    # Only accessible via 127.0.0.1 from the sidecar
+
+  memos-sidecar:
+    image: ghostunnel/ghostunnel:v1.8.4-alpine
+    container_name: memos-sidecar
+    restart: unless-stopped
+    network_mode: service:memos  # Shares network stack with memos
+    command:
+      - "server"
+      - "--listen=0.0.0.0:8443"
+      - "--target=127.0.0.1:5230"
+      - "--cert=/certs/memos.crt"
+      - "--key=/certs/memos.key"
+      - "--cacert=/certs/ca.crt"
+      - "--allow-cn=gateway.lab"
+    volumes:
+      # Server certificate and private key for mTLS
+      - /etc/pki/homelab/certs/memos.crt:/certs/memos.crt:ro
+      - /etc/pki/homelab/private/memos.key:/certs/memos.key:ro
+      # CA certificate for client certificate validation
+      - /etc/pki/homelab/certs/root-ca.crt:/certs/ca.crt:ro
+    user: "65534:65534"  # nobody:nobody
+    labels:
+      - "traefik.enable=false"  # Disable Traefik for sidecar
+    depends_on:
+      - memos
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "8443"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Sure Finance - Financial Management
+  sure-finance-db:
+    image: postgres:16
+    container_name: sure-finance-db
+    restart: unless-stopped
+    networks:
+      - proxy_net
+    volumes:
+      - /opt/apps/sure/postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=sure_user
+      - POSTGRES_PASSWORD=sure_secure_password_change_me
+      - POSTGRES_DB=sure_production
+    labels:
+      - "traefik.enable=false"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sure_user -d sure_production"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  sure-finance-redis:
+    image: redis:latest
+    container_name: sure-finance-redis
+    restart: unless-stopped
+    networks:
+      - proxy_net
+    volumes:
+      - /opt/apps/sure/redis:/data
+    labels:
+      - "traefik.enable=false"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  sure-finance:
+    image: ghcr.io/we-promise/sure:latest
+    container_name: sure-finance
+    restart: unless-stopped
+    networks:
+      - proxy_net
+    volumes:
+      - /opt/apps/sure/storage:/rails/storage
+    environment:
+      - SECRET_KEY_BASE=6edbdb8e240c9948e418190249be25c2db33152e677911b3a00a9f40931e36be232ca43ef94c3b067260b65085c67816513b64848478720cd4a8f8f2de10a1d1
+      - SELF_HOSTED=true
+      - RAILS_FORCE_SSL=false
+      - RAILS_ASSUME_SSL=false
+      - DB_HOST=sure-finance-db
+      - DB_PORT=5432
+      - POSTGRES_DB=sure_production
+      - POSTGRES_USER=sure_user
+      - POSTGRES_PASSWORD=sure_secure_password_change_me
+      - REDIS_URL=redis://sure-finance-redis:6379/1
+    depends_on:
+      sure-finance-db:
+        condition: service_healthy
+      sure-finance-redis:
+        condition: service_healthy
+    labels:
+      {{ ztn_http_labels('sure-finance', 'finance.lab', 8443) }}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # Application listens on port 3000 internally
+    # Only accessible via 127.0.0.1 from the sidecar
+
+  sure-finance-worker:
+    image: ghcr.io/we-promise/sure:latest
+    container_name: sure-finance-worker
+    restart: unless-stopped
+    command: bundle exec sidekiq
+    networks:
+      - proxy_net
+    volumes:
+      - /opt/apps/sure/storage:/rails/storage
+    environment:
+      - SECRET_KEY_BASE=6edbdb8e240c9948e418190249be25c2db33152e677911b3a00a9f40931e36be232ca43ef94c3b067260b65085c67816513b64848478720cd4a8f8f2de10a1d1
+      - SELF_HOSTED=true
+      - RAILS_FORCE_SSL=false
+      - RAILS_ASSUME_SSL=false
+      - DB_HOST=sure-finance-db
+      - DB_PORT=5432
+      - POSTGRES_DB=sure_production
+      - POSTGRES_USER=sure_user
+      - POSTGRES_PASSWORD=sure_secure_password_change_me
+      - REDIS_URL=redis://sure-finance-redis:6379/1
+    depends_on:
+      sure-finance-db:
+        condition: service_healthy
+      sure-finance-redis:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=false"
+
+  sure-finance-sidecar:
+    image: ghostunnel/ghostunnel:v1.8.4-alpine
+    container_name: sure-finance-sidecar
+    restart: unless-stopped
+    network_mode: service:sure-finance  # Shares network stack with sure-finance
+    command:
+      - "server"
+      - "--listen=0.0.0.0:8443"
+      - "--target=127.0.0.1:3000"
+      - "--cert=/certs/sure-finance.crt"
+      - "--key=/certs/sure-finance.key"
+      - "--cacert=/certs/ca.crt"
+      - "--allow-cn=gateway.lab"
+    volumes:
+      # Server certificate and private key for mTLS
+      - /etc/pki/homelab/certs/sure-finance.crt:/certs/sure-finance.crt:ro
+      - /etc/pki/homelab/private/sure-finance.key:/certs/sure-finance.key:ro
+      # CA certificate for client certificate validation
+      - /etc/pki/homelab/certs/root-ca.crt:/certs/ca.crt:ro
+    user: "65534:65534"  # nobody:nobody
+    labels:
+      - "traefik.enable=false"  # Disable Traefik for sidecar
+    depends_on:
+      - sure-finance
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "8443"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Trilium - Personal Knowledge Base
+  trilium:
+    image: triliumnext/trilium:stable
+    container_name: trilium
+    restart: unless-stopped
+    networks:
+      - proxy_net
+    volumes:
+      - /opt/apps/trilium:/home/node/trilium-data
+    environment:
+      - TRILIUM_NETWORK_HOST=0.0.0.0
+      - TRILIUM_NETWORK_PORT=8080
+    labels:
+      {{ ztn_http_labels_with_middleware('trilium', 'brain.lab', 8443, 'trilium-headers') }}
+    # Application listens on port 8080 internally
+    # Only accessible via 127.0.0.1 from the sidecar
+
+  trilium-sidecar:
+    image: ghostunnel/ghostunnel:v1.8.4-alpine
+    container_name: trilium-sidecar
+    restart: unless-stopped
+    network_mode: service:trilium  # Shares network stack with trilium
+    command:
+      - "server"
+      - "--listen=0.0.0.0:8443"
+      - "--target=127.0.0.1:8080"
+      - "--cert=/certs/trilium.crt"
+      - "--key=/certs/trilium.key"
+      - "--cacert=/certs/ca.crt"
+      - "--allow-cn=gateway.lab"
+    volumes:
+      # Server certificate and private key for mTLS
+      - /etc/pki/homelab/certs/trilium.crt:/certs/trilium.crt:ro
+      - /etc/pki/homelab/private/trilium.key:/certs/trilium.key:ro
+      # CA certificate for client certificate validation
+      - /etc/pki/homelab/certs/root-ca.crt:/certs/ca.crt:ro
+    user: "65534:65534"  # nobody:nobody
+    labels:
+      - "traefik.enable=false"  # Disable Traefik for sidecar
+    depends_on:
+      - trilium
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "8443"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  proxy_net:
+    external: true

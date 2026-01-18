@@ -6,3 +6,13 @@
     name: firewalld
     state: reloaded
   become: true
+
+- name: Restart infrastructure services
+  community.docker.docker_compose_v2:
+    state: restarted
+    project_src: /composes
+    files:
+      - infra_core_services.compose.yml
+    project_name: infra_core_services
+  become: true
+  listen: "restart infra services"

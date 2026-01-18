@@ -32,19 +32,19 @@ pki_services:
     description: Wakeup on Lan Host
     ip: 192.168.1.77
 
-  - name: excalidraw
-    dns: draw.lab
-    description: Excalidraw Host
-    ip: 192.168.1.77
-
   - name: memos
     dns: daily.lab
     description: Memos Host, Fleeting Notes/Daily Journal
     ip: 192.168.1.77
 
-  - name: maybe_finance
+  - name: sure-finance
     dns: finance.lab
-    description: Maybe Finance Host, Financial Control
+    description: Sure Finance Host, Financial Control
+    ip: 192.168.1.77
+
+  - name: trilium
+    dns: brain.lab
+    description: Trilium Host, Personal Knowledge Base
     ip: 192.168.1.77
 
 # SSH Key Management

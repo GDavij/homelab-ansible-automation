@@ -89,7 +89,7 @@
     project_name: infra_core_services
     pull: missing
     remove_orphans: true
-    recreate: auto  # Recreate only when compose config changes (preserves data)
+    recreate: always  # Always recreate containers to guarantee consistency
   become: true
   tags:
     - infra_gateways

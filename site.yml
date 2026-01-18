@@ -54,3 +54,11 @@
         - traefik
         - adguard
       when: inventory_hostname in groups['Gateways']
+
+    - name: Application Gateway Services
+      ansible.builtin.import_role:
+        name: apps_gateways
+      tags:
+        - apps_gateways
+        - applications
+      when: inventory_hostname in groups['Gateways']

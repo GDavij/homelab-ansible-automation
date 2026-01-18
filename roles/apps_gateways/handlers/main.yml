@@ -1,0 +1,10 @@
+---
+- name: Restart application services
+  community.docker.docker_compose_v2:
+    state: restarted
+    project_src: /composes
+    files:
+      - apps_services.compose.yml
+    project_name: apps_services
+  become: true
+  listen: "restart apps services"

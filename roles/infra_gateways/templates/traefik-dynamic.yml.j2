@@ -4,6 +4,11 @@ http:
       basicAuth:
         users:
           - "{{ traefik_username }}:{{ traefik_password_hash }}"
+    
+    trilium-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
 
   serversTransports:
 {% for service in pki_services %}
@@ -13,8 +18,8 @@ http:
       rootCAs:
         - /etc/traefik/certs/lab_root_ca.crt
       certificates:
-        - certFile: /etc/traefik/certs/{{ service.name }}.crt
-          keyFile: /etc/traefik/certs/{{ service.name }}.key
+        - certFile: /etc/traefik/certs/traefik.crt
+          keyFile: /etc/traefik/certs/traefik.key
       maxIdleConnsPerHost: 42
       forwardingTimeouts:
         dialTimeout: 30s
@@ -28,6 +33,8 @@ tcp:
     # Static TCP router for host network GhostTunnel services
     upsnap-tcp:
       rule: "HostSNI(`snap.lab`)"
+      entryPoints:
+        - websecure
       service: upsnap-tcp-service
       tls:
         passthrough: true

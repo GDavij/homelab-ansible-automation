@@ -1,0 +1,39 @@
+- name: Create application data directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  become: true
+  loop:
+    - /opt/apps
+    - /opt/apps/memos
+    - /opt/apps/sure
+    - /opt/apps/sure/postgres
+    - /opt/apps/sure/redis
+    - /opt/apps/sure/storage
+    - /opt/apps/trilium
+  tags:
+    - apps_gateways
+
+- name: Build Application Services Docker Compose
+  ansible.builtin.template:
+    src: templates/apps_services.compose.j2
+    dest: /composes/apps_services.compose.yml
+    mode: '0644'
+  become: true
+  tags:
+    - apps_gateways
+
+- name: Deploy Application Services
+  community.docker.docker_compose_v2:
+    state: present
+    project_src: /composes
+    files:
+      - apps_services.compose.yml
+    project_name: apps_services
+    pull: missing
+    remove_orphans: true
+    recreate: always  # Always recreate containers to guarantee consistency
+  become: true
+  tags:
+    - apps_gateways
