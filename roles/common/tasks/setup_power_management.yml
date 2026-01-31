@@ -14,6 +14,14 @@
     - common
     - essential
 
+- name: "Check if logind.conf exists"
+  ansible.builtin.stat:
+    path: /etc/systemd/logind.conf
+  register: logind_conf_stat
+  tags:
+    - common
+    - essential
+
 - name: "Configure Logind to Handle Lid Close"
   ansible.builtin.lineinfile:
     path: /etc/systemd/logind.conf
@@ -28,16 +36,7 @@
     - { key: "IdleActionSec", value: "0" }
   become: true
   notify: Restart systemd-logind
-  tags:
-    - common
-    - essential
-
-- name: "Ensure SSH Service is Always Running"
-  ansible.builtin.service:
-    name: "{{ common_ssh_service_name | default('ssh') }}"
-    state: started
-    enabled: true
-  become: true
+  when: logind_conf_stat.stat.exists
   tags:
     - common
     - essential
@@ -51,6 +50,16 @@
         else
         'sshd'
       }}
+  tags:
+    - common
+    - essential
+
+- name: "Ensure SSH Service is Always Running"
+  ansible.builtin.service:
+    name: "{{ common_ssh_service_name | default('ssh') }}"
+    state: started
+    enabled: true
+  become: true
   tags:
     - common
     - essential

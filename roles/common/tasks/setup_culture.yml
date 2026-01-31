@@ -5,11 +5,21 @@
     - common
     - essential
 
-- name: "Ensure Locales are generated"
+- name: "Ensure Locales are generated (Debian/Ubuntu)"
   community.general.locale_gen:
     name: "{{ item }}"
     state: present
   loop: "{{ default_locales }}"
+  when: ansible_os_family == "Debian"
+  tags:
+    - common
+    - essential
+
+- name: "Ensure locale support is installed (Fedora/RedHat)"
+  ansible.builtin.dnf:
+    name: glibc-all-langpacks
+    state: present
+  when: ansible_os_family == "RedHat"
   tags:
     - common
     - essential
@@ -32,22 +42,43 @@
     - common
     - essential
 
-- name: "Install NTP (Time Synchronization)"
+- name: "Install NTP - systemd-timesyncd (Debian/Ubuntu)"
   ansible.builtin.package:
     name: systemd-timesyncd
     state: present
-  when: ansible_service_mgr == "systemd"
+  when: ansible_os_family == "Debian"
   become: true
   tags:
     - common
     - essential
 
-- name: "System: Enable NTP Synchronization"
+- name: "Enable NTP - systemd-timesyncd (Debian/Ubuntu)"
   ansible.builtin.service:
     name: systemd-timesyncd
     state: started
     enabled: true
-  when: ansible_service_mgr == "systemd"
+  when: ansible_os_family == "Debian"
+  become: true
+  tags:
+    - common
+    - essential
+
+- name: "Install NTP - chrony (Fedora/RedHat)"
+  ansible.builtin.dnf:
+    name: chrony
+    state: present
+  when: ansible_os_family == "RedHat"
+  become: true
+  tags:
+    - common
+    - essential
+
+- name: "Enable NTP - chronyd (Fedora/RedHat)"
+  ansible.builtin.service:
+    name: chronyd
+    state: started
+    enabled: true
+  when: ansible_os_family == "RedHat"
   become: true
   tags:
     - common
