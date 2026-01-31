@@ -1,0 +1,18 @@
+- name: Workstation Configuration Playbook
+  hosts: Workstations
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Common System Setup
+      ansible.builtin.import_role:
+        name: common
+      tags:
+        - common
+        - base
+
+    - name: Install NVIDIA GPU Drivers
+      ansible.builtin.import_role:
+        name: nvidia-gpu
+      tags:
+        - nvidia-gpu
+        - graphics

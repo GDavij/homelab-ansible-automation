@@ -1,64 +1,7 @@
-- name: Homelab Automation Playbook
-  hosts: all
-  become: true
-  gather_facts: true
-  tasks:
-    - name: Common System Setup
-      ansible.builtin.import_role:
-        name: common
-      tags:
-        - common
-        - base
+---
+# Master playbook that imports all specific playbooks
+- name: Import Gateway Playbook
+  ansible.builtin.import_playbook: gateways.yml
 
-    - name: Security Hardening
-      ansible.builtin.import_role:
-        name: security
-      tags:
-        - security
-        - users
-
-    - name: Network Gateway Configuration
-      ansible.builtin.import_role:
-        name: network_gateways
-      tags:
-        - network
-        - firewall
-      when: inventory_hostname in groups['Gateways']
-
-    - name: Setup Tailscale ZTN Tunnel (Optional)
-      ansible.builtin.include_role:
-        name: tailscale
-      tags:
-        - tailscale
-        - ztn
-      when: enable_tailscale | default(false)
-
-    - name: PKI Certificate Management
-      ansible.builtin.import_role:
-        name: pki
-      tags:
-        - pki
-        - certificates
-
-    - name: Docker Installation
-      ansible.builtin.import_role:
-        name: docker
-      tags:
-        - docker
-
-    - name: Infrastructure Gateway Services
-      ansible.builtin.import_role:
-        name: infra_gateways
-      tags:
-        - infra_gateways
-        - traefik
-        - adguard
-      when: inventory_hostname in groups['Gateways']
-
-    - name: Application Gateway Services
-      ansible.builtin.import_role:
-        name: apps_gateways
-      tags:
-        - apps_gateways
-        - applications
-      when: inventory_hostname in groups['Gateways']
+- name: Import Workstation Playbook
+  ansible.builtin.import_playbook: workstations.yml

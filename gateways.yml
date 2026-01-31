@@ -1,0 +1,61 @@
+- name: Gateway Configuration Playbook
+  hosts: Gateways
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Common System Setup
+      ansible.builtin.import_role:
+        name: common
+      tags:
+        - common
+        - base
+
+    - name: Security Hardening
+      ansible.builtin.import_role:
+        name: security
+      tags:
+        - security
+        - users
+
+    - name: Network Gateway Configuration
+      ansible.builtin.import_role:
+        name: network_gateways
+      tags:
+        - network
+        - firewall
+
+    - name: Setup Tailscale ZTN Tunnel (Optional)
+      ansible.builtin.include_role:
+        name: tailscale
+      tags:
+        - tailscale
+        - ztn
+      when: enable_tailscale | default(false)
+
+    - name: PKI Certificate Management
+      ansible.builtin.import_role:
+        name: pki
+      tags:
+        - pki
+        - certificates
+
+    - name: Docker Installation
+      ansible.builtin.import_role:
+        name: docker
+      tags:
+        - docker
+
+    - name: Infrastructure Gateway Services
+      ansible.builtin.import_role:
+        name: infra_gateways
+      tags:
+        - infra_gateways
+        - traefik
+        - adguard
+
+    - name: Application Gateway Services
+      ansible.builtin.import_role:
+        name: apps_gateways
+      tags:
+        - apps_gateways
+        - applications
