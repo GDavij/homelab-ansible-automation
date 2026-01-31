@@ -1,0 +1,9 @@
+- name: Build Akmods
+  ansible.builtin.command: /usr/sbin/akmods --force
+  changed_when: false
+
+- name: Reboot Monster
+  ansible.builtin.reboot:
+    msg: "Rebooting to load NVIDIA Open Kernel modules for ML"
+    reboot_timeout: 900
+    test_command: nvidia-smi

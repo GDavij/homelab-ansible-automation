@@ -1,0 +1,44 @@
+- name: Ensure RPM Fusion Repos are active
+  ansible.builtin.dnf:
+    name:
+      - "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-{{ ansible_distribution_major_version }}.noarch.rpm"
+      - "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-{{ ansible_distribution_major_version }}.noarch.rpm"
+    state: present
+    disable_gpg_check: true
+  tags:
+    - nvidia-gpu
+
+- name: Install NVIDIA Drivers and CUDA
+  ansible.builtin.dnf:
+    name:
+      - akmod-nvidia
+      - xorg-x11-drv-nvidia-cuda
+      - xorg-x11-drv-nvidia-cuda-libs
+      - nvidia-container-toolkit
+    state: present
+  notify:
+    - Build Akmods
+    - Reboot Monster
+  tags:
+    - nvidia-gpu
+
+- name: Force immediate build and reboot
+  ansible.builtin.meta: flush_handlers
+  tags:
+    - nvidia-gpu
+
+- name: Verify NVIDIA Driver Installation
+  ansible.builtin.command: nvidia-smi
+  register: nvidia_smi_output
+  changed_when: true
+  tags:
+    - nvidia-gpu
+
+
+- name: Display NVIDIA Driver Information
+  ansible.builtin.debug:
+    msg: "{{ nvidia_smi_output.stdout }}"
+  when: nvidia_smi_output.rc == 0
+  failed_when: nvidia_smi_output.rc != 0
+  tags:
+    - nvidia-gpu

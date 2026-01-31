@@ -1,0 +1,5 @@
+- name: Install Nvidia Drivers for Fedora
+  ansible.builtin.include_tasks: install-fedora.yml
+  when: ansible_os_family == "RedHat"
+  tags:
+    - nvidia-gpu
