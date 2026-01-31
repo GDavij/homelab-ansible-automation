@@ -34,9 +34,9 @@
   tags:
     - network_gateways
 
-- name: Define IGRESS Policies
+- name: Define INGRESS Policies
   ansible.builtin.include_tasks:
-    file: firewall-igress-policies.yml
+    file: firewall-ingress-policies.yml
   tags:
     - network_gateways
 
