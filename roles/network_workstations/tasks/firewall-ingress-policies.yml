@@ -1,0 +1,33 @@
+- name: Allow SSH Access from Gateway Hosts (For Jumping Box Function)
+  ansible.posix.firewalld:
+    zone: underlay_network
+    rich_rule: 'rule family="ipv4" source address="{{ hostvars[item].ansible_host }}" service name="ssh" accept'
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  loop: "{{ groups['Gateways'] }}"
+  tags:
+    - network_workstations
+
+- name: Allow HTTP Access from Subnet
+  ansible.posix.firewalld:
+    zone: underlay_network
+    rich_rule: 'rule family="ipv4" source address="{{ subnet_cidr }}" service name="http" accept'
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  tags:
+    - network_workstations
+
+- name: Allow HTTPS Access from Subnet
+  ansible.posix.firewalld:
+    zone: underlay_network
+    rich_rule: 'rule family="ipv4" source address="{{ subnet_cidr }}" service name="https" accept'
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  tags:
+    - network_workstations

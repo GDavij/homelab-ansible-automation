@@ -16,3 +16,17 @@
       tags:
         - nvidia-gpu
         - graphics
+
+    - name: Security Hardening
+      ansible.builtin.import_role:
+        name: security
+      tags:
+        - security
+        - users
+
+    - name: Network Workstation Configuration
+      ansible.builtin.import_role:
+        name: network_workstations
+      tags:
+        - network
+        - firewall

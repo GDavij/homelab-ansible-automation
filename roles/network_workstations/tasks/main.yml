@@ -1,0 +1,22 @@
+- name: Remove any UFW Configuration
+  ansible.builtin.include_tasks:
+   file: disable-ufw.yml
+  tags:
+   - network_workstations
+
+- name: Setup Firewalld as Firewall Manager
+  ansible.builtin.include_tasks:
+   file: firewalld.yml
+  tags:
+   - network_workstations
+
+- name: Refresh network facts
+  ansible.builtin.setup:
+   gather_subset: network
+  become: true
+
+- name: Configure Firewall Rules
+  ansible.builtin.include_tasks:
+   file: firewall-policies.yml
+  tags:
+   - network_workstations
