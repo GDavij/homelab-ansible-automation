@@ -25,6 +25,7 @@ pki_services:
   - name: traefik
     dns: gateway.lab
     description: Gateway Proxy
+    credential_certificate: true
     ip: 192.168.1.77
 
   - name: upsnap
@@ -54,7 +55,7 @@ local_keys_dir: "{{ ssh_keys_dir }}"
 # Client Devices for mTLS Authentication
 pki_client_devices:
   - name: controller
-    common_name: "Controller Arhc Linux Notebook"
+    common_name: "Controller Arch Linux Notebook"
     description: "Controller Client Certificate"
     user: "gdavij"
 
@@ -66,4 +67,4 @@ pki_client_devices:
 docker_install_compose_plugin: true
 docker_compose_package_state: present
 
-enable_tailscale: true
+enable_tailscale: false

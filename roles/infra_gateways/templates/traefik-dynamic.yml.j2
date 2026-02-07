@@ -1,4 +1,37 @@
+{% if http_routers is defined and http_routers|length > 0 %}
 http:
+  routers:
+{% for router in http_routers %}
+    {{ router.name }}-router:
+      rule: "{{ router.rule }}"
+      entryPoints:
+{% for entrypoints in router.entryPoints %}
+        - {{ entrypoints }}
+{% endfor %}
+{% if router.internal is defined and router.internal %}
+      service: api@internal
+{% else %}
+      service: {{ router.name }}-service
+{% endif %}
+      tls: {}
+{% endfor %}
+
+  services:
+{% for router in http_routers %}
+{% if router.internal is not defined %}
+    {{ router.name }}-service:
+      loadBalancer:
+{% if router.mtls %}
+        serversTransport: {{ router.name }}-transport
+{% endif %}
+        servers:
+{% for server in router.service.loadBalancer.servers %}
+          - url: "{{ server.url }}"
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endif %}
+
   middlewares:
     traefik-auth:
       basicAuth:
@@ -10,6 +43,7 @@ http:
         customRequestHeaders:
           X-Forwarded-Proto: "https"
 
+{% if pki_services is defined and pki_services|length > 0 %}
   serversTransports:
 {% for service in pki_services %}
     {{ service.name }}-transport:
@@ -27,30 +61,41 @@ http:
         idleConnTimeout: 120s
         readIdleTimeout: 60s
 {% endfor %}
+{% endif %}
 
+{% if tcp_routers is defined and tcp_routers|length > 0 %}
 tcp:
   routers:
-    # Static TCP router for host network GhostTunnel services
-    upsnap-tcp:
-      rule: "HostSNI(`snap.lab`)"
+{% for router in tcp_routers %}
+    {{ router.name }}-router:
+      rule: "{{ router.rule }}"
       entryPoints:
-        - websecure
-      service: upsnap-tcp-service
+{% for entrypoints in router.entryPoints %}
+        - {{ entrypoints }}
+{% endfor %}
+  service: {{ router.name }}-service
       tls:
-        passthrough: true
-  
+        passthrough: {{ router.tls.passthrough }}
+{% endfor %}
+
   services:
-    # Static TCP service for host network GhostTunnel
-    upsnap-tcp-service:
+{% for router in tcp_routers %}
+    {{ router.name }}-service:
       loadBalancer:
         servers:
-          - address: "192.168.1.77:8443"  # Host IP and GhostTunnel port
+{% for server in router.service.loadBalancer.servers %}
+          - address: "{{ server.address }}"
+{% endfor %}
+{% endfor %}
 
+{% endif %}
+
+{% if pki_services is defined and pki_services|length > 0 %}
 tls:
   certificates:
 {% for service in pki_services %}
-    - certFile: /etc/traefik/certs/{{ service.name }}.crt
-      keyFile: /etc/traefik/certs/{{ service.name }}.key
+  - certFile: /etc/traefik/certs/{{ service.name }}.crt
+    keyFile: /etc/traefik/certs/{{ service.name }}.key
 {% endfor %}
   options:
     default:
@@ -61,3 +106,5 @@ tls:
           - /etc/traefik/certs/lab_root_ca.crt
         clientAuthType: RequireAndVerifyClientCert
       sniStrict: true
+
+{% endif %}

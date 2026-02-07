@@ -1,13 +1,3 @@
-{% macro ztn_labels(name, dns, port=80, scheme='https') -%}
-- "traefik.enable=true"
-- "traefik.http.routers.{{ name }}.rule=Host(`{{ dns }}`)"
-- "traefik.http.routers.{{ name }}.entrypoints=websecure"
-- "traefik.http.routers.{{ name }}.tls=true"
-- "traefik.http.services.{{ name }}.loadbalancer.server.port={{ port }}"
-- "traefik.http.services.{{ name }}.loadbalancer.server.scheme={{ scheme }}"
-- "traefik.http.services.{{ name }}.loadbalancer.serverstransport={{ name }}-transport@file"
-{%- endmacro %}
-
 # yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-go/master/schema/compose-spec.json
 
 services:
@@ -29,7 +19,6 @@ services:
       - proxy_net
     
     command:
-      - "--providers.docker=true"
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
@@ -54,19 +43,9 @@ services:
       - /etc/pki/homelab/private/{{ service.name }}.key:/etc/traefik/certs/{{ service.name }}.key:ro
 {% endfor %}
 
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=Host(`gateway.lab`)"
-      - "traefik.http.routers.traefik.entrypoints=websecure"
-      - "traefik.http.routers.traefik.tls=true"
-      - "traefik.http.routers.traefik.tls.options=default"
-      - "traefik.http.routers.traefik.service=api@internal"
-      - "traefik.http.routers.traefik.middlewares=traefik-auth@file"
-
-
   dns:
     image: adguard/adguardhome:latest
-    container_name: dns_adguard
+    container_name: dns
     restart: unless-stopped
     networks:
       - core_net
@@ -87,18 +66,45 @@ services:
     volumes:
       - /opt/core/adguard/work:/opt/adguardhome/work
       - /opt/core/adguard/conf:/opt/adguardhome/conf
-      - /etc/pki/homelab/certs/adguard.crt:/opt/adguardhome/conf/adguard.crt:ro
-      - /etc/pki/homelab/private/adguard.key:/opt/adguardhome/conf/adguard.key:ro
 
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.adguard.rule=Host(`dns.lab`)"
-      - "traefik.http.routers.adguard.entrypoints=websecure"
-      - "traefik.http.routers.adguard.tls=true"
-      - "traefik.http.services.adguard.loadbalancer.server.port=443"
-      - "traefik.http.services.adguard.loadbalancer.server.scheme=https"
-      - "traefik.http.services.adguard.loadbalancer.serverstransport=adguard-transport@file"
-      - "traefik.http.routers.adguard.tls.options=default"
+  dns-sidecar:
+    image: ghostunnel/ghostunnel:v1.8.4-alpine
+    container_name: dns-sidecar
+    restart: unless-stopped
+    network_mode: service:dns
+    command:
+      - "server"
+      - "--listen=0.0.0.0:8443"
+      - "--target=127.0.0.1:80"
+      - "--cert=/certs/adguard.crt"
+      - "--key=/certs/adguard.key"
+      - "--cacert=/certs/ca.crt"
+      - "--allow-all"
+    
+    volumes:
+      # Server certificate and private key for mTLS
+      - /etc/pki/homelab/certs/adguard.crt:/certs/adguard.crt:ro
+      - /etc/pki/homelab/private/adguard.key:/certs/adguard.key:ro
+      # CA certificate for client certificate validation
+      - /etc/pki/homelab/certs/root-ca.crt:/certs/ca.crt:ro
+    
+    # Security: Run as non-root user for better security
+    user: "65534:65534"  # nobody:nobody
+    
+    depends_on:
+      - upsnap
+    
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "8443"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    # GhostTunnel mTLS proxy for Upsnap on host network
+    # Provides secure access to Upsnap via client certificates
+    # Accessible via Traefik static configuration at snap.lab:8443
+
 
   upsnap:
     image: ghcr.io/seriousm4x/upsnap:5.2
@@ -129,17 +135,14 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    
-    labels:
-      - "traefik.enable=false"  # Disable Traefik for host network container
-    
+
     # Host network mode enables Wake-on-LAN magic packet transmission
     # No Traefik labels - uses static configuration for host network GhostTunnel
     # Access via GhostTunnel proxy on host network at port 8443
 
-  upsnap-ghosttunnel:
+  upsnap-sidecar:
     image: ghostunnel/ghostunnel:v1.8.4-alpine
-    container_name: upsnap-ghosttunnel
+    container_name: upsnap-sidecar
     restart: unless-stopped
     network_mode: host  # Host network for mTLS proxy access
     
@@ -171,10 +174,7 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-    
-    labels:
-      - "traefik.enable=false"  # Disable Traefik for host network container
-    
+
     # GhostTunnel mTLS proxy for Upsnap on host network
     # Provides secure access to Upsnap via client certificates
     # Accessible via Traefik static configuration at snap.lab:8443

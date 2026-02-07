@@ -53,7 +53,7 @@
 
 - name: Build Infrastructure Services Docker Compose
   ansible.builtin.template:
-    src: templates/infra_services.compose.j2
+    src: templates/infra_services.compose.yml.j2
     dest: /composes/infra_core_services.compose.yml
     mode: '0644'
   become: true

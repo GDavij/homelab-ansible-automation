@@ -69,8 +69,7 @@
           - digitalSignature
           - keyEncipherment
         key_usage_critical: true
-        extended_key_usage:
-          - serverAuth
+        extended_key_usage: "{{ ['serverAuth', 'clientAuth'] if service.credential_certificate | default(false) else ['serverAuth'] }}"
         extended_key_usage_critical: true
       delegate_to: localhost
 

@@ -3,3 +3,77 @@ traefik_username: "gatekeeper"
 # Pre-generated bcrypt hash for password "changeme" (rounds=12)
 # Generated using: python3 scripts/generate_adguard_password.py
 traefik_password_hash: "$2b$12$JA8MBJtr4lkUJijw2d9BeOEI4x.S4n4o.dqTWZdi9BlBfeirytl6G"
+
+http_routers:
+  - name: adguard
+    rule: "Host(`dns.lab`)"
+    entryPoints:
+      - websecure
+    mtls: true
+    service:
+      loadBalancer:
+        servers:
+          - url: "https://dns:8443"
+    tls:
+      passthrough: false
+
+  - name: traefik
+    rule: "Host(`gateway.lab`)"
+    entryPoints:
+      - websecure
+    mtls: true
+    internal: true
+    service:
+    tls:
+      passthrough: false
+
+  - name: upsnap
+    rule: "Host(`snap.lab`)"
+    entryPoints:
+      - websecure
+    mtls: true
+    service:
+      loadBalancer:
+        servers:
+          - url: "https://192.168.1.77:8443"
+    tls:
+      passthrough: false
+
+  - name: memos
+    rule: "Host(`daily.lab`)"
+    entryPoints:
+      - websecure
+    mtls: true
+    service:
+      loadBalancer:
+        servers:
+          - url: "https://memos:8443"
+    tls:
+      passthrough: false
+
+  - name: sure-finance
+    rule: "Host(`finance.lab`)"
+    entryPoints:
+      - websecure
+    mtls: true
+    service:
+      loadBalancer:
+        servers:
+          - url: "https://sure-finance:8443"
+    tls:
+      passthrough: false
+
+  - name: trilium
+    rule: "Host(`brain.lab`)"
+    entryPoints:
+      - websecure
+    mtls: true
+    service:
+      loadBalancer:
+        servers:
+          - url: "https://trilium:8443"
+    tls:
+      passthrough: false
+
+tcp_routers: []
+
