@@ -10,13 +10,6 @@
         - common
         - base
 
-    - name: Security Hardening
-      ansible.builtin.import_role:
-        name: security
-      tags:
-        - security
-        - users
-
     - name: Network Gateway Configuration
       ansible.builtin.import_role:
         name: network_gateways

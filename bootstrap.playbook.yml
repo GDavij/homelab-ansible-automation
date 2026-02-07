@@ -1,0 +1,23 @@
+- name: Setup Security foreach Gateway Machine
+  hosts: Gateways
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Security Hardening
+      ansible.builtin.import_role:
+        name: security
+      tags:
+        - security
+        - users
+
+- name: Setup Security foreach Workstation Machine
+  hosts: Workstations
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Security Hardening
+      ansible.builtin.import_role:
+        name: security
+      tags:
+        - security
+        - users
