@@ -1,0 +1,15 @@
+---
+- name: Restart Containerd (Kubernetes Core)
+  ansible.builtin.systemd:
+    name: containerd
+    state: restarted
+  become: true
+
+- name: "Restart Cilium Agents"
+  ansible.builtin.command:
+    cmd: "kubectl -n kube-system rollout restart ds/cilium"
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  become: true
+  changed_when: true
+  when: kubernetes_core_workstations_cilium_hubble_result.changed

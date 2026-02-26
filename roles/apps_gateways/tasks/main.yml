@@ -1,3 +1,4 @@
+---
 - name: Create application data directories
   ansible.builtin.file:
     path: "{{ item }}"
@@ -17,7 +18,7 @@
 
 - name: Build Application Services Docker Compose
   ansible.builtin.template:
-    src: templates/apps_services.compose.yml.j2
+    src: apps_services.gateways.compose.yml.j2
     dest: /composes/apps_services.compose.yml
     mode: '0644'
   become: true
@@ -33,7 +34,19 @@
     project_name: apps_services
     pull: missing
     remove_orphans: true
-    recreate: always  # Always recreate containers to guarantee consistency
+    recreate: always
+  become: true
+  tags:
+    - apps_gateways
+
+- name: Verify Application Services are Healthy
+  ansible.builtin.command:
+    cmd: docker compose -f /composes/apps_services.compose.yml ps --format json
+  register: apps_gateways_health
+  changed_when: false
+  retries: 6
+  delay: 10
+  until: "'unhealthy' not in apps_gateways_health.stdout"
   become: true
   tags:
     - apps_gateways

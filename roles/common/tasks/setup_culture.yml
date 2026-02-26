@@ -1,3 +1,4 @@
+---
 - name: "Set Default Timezone"
   community.general.timezone:
     name: "{{ default_timezone }}"

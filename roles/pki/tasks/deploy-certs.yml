@@ -1,12 +1,14 @@
+---
 - name: Ensure PKI Directories Exists on Hosts
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ item.path }}"
     state: directory
-    mode: '0755'
+    mode: "{{ item.mode }}"
+    group: "{{ item.group | default('root') }}"
   become: true
   loop:
-    - /etc/pki/homelab/certs
-    - /etc/pki/homelab/private
+    - { path: /etc/pki/homelab/certs, mode: '0755' }
+    - { path: /etc/pki/homelab/private, mode: '0750', group: "{{ ssl_cert_group | default('root') }}" }
   tags:
     - pki
     - upload
@@ -32,7 +34,7 @@
   with_nested:
     - "{{ pki_services }}"
     - - { ext: 'crt', dir: 'certs', mode: '0644' }
-      - { ext: 'key', dir: 'private', mode: '0644' }
+      - { ext: 'key', dir: 'private', mode: '0640' }
   tags:
     - pki
     - upload
@@ -54,7 +56,7 @@
   ansible.builtin.assert:
     that:
       - pki_cert_validation.results[ansible_loop.index0].subject.commonName == item.dns
-      - pki_cert_validation.results[ansible_loop.index0].subject_alt_name | select('match', 'DNS:' + item.dns) | list | length > 0
+      - pki_cert_validation.results[ansible_loop.index0].subject_alt_name | select('match', 'DNS:' + (item.dns | regex_escape)) | list | length > 0
       - pki_cert_validation.results[ansible_loop.index0].issuer.commonName == pki_ca_common_name
       - not pki_cert_validation.results[ansible_loop.index0].expired
     fail_msg: "Certificate validation failed for {{ item.name }}"

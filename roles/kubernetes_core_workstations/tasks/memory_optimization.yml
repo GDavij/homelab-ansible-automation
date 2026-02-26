@@ -1,0 +1,8 @@
+---
+- name: Disable systemd-oomd to maintain heavy workloads (ETCD) stable
+  ansible.builtin.service:
+    name: systemd-oomd
+    state: stopped
+    enabled: false
+    masked: true
+  become: true

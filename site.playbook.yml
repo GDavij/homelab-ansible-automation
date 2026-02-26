@@ -1,7 +1,6 @@
 ---
-# Master playbook that imports all specific playbooks
 - name: Import Gateway Playbook
-  ansible.builtin.import_playbook: gateways.yml
+  ansible.builtin.import_playbook: ./gateways.playbook.yml
 
 - name: Import Workstation Playbook
-  ansible.builtin.import_playbook: workstations.yml
+  ansible.builtin.import_playbook: ./workstations.playbook.yml

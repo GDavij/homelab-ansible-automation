@@ -1,0 +1,44 @@
+---
+- name: Copy Metrics Server Manifest to Workstation
+  ansible.builtin.copy:
+    src: metrics_server.k8s.yml
+    dest: "/tmp/metrics_server.k8s.yml"
+    mode: '0644'
+  become: true
+
+- name: Apply Metrics Server Manifest
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    src: /tmp/metrics_server.k8s.yml
+    kubeconfig: /etc/kubernetes/admin.conf
+
+- name: Approve Kubelet CSR
+  ansible.builtin.shell: |
+    set -o pipefail
+    # Wait for the Api Server to be Ready in a possible I/O Storm
+    timeout 30s bash -c 'until kubectl get csr --kubeconfig=/etc/kubernetes/admin.conf; do sleep 2; done'
+
+    # Approve any pending CSRs
+    CSRS=$(kubectl get csr --kubeconfig=/etc/kubernetes/admin.conf | grep Pending | awk '{ print $1 }')
+    if [ -n "$CSRS" ]; then
+      for csr in $CSRS; do
+        kubectl certificate approve $csr --kubeconfig=/etc/kubernetes/admin.conf
+      done
+    fi
+  become: true
+  register: kubernetes_scaling_workstations_csr_approval
+  changed_when: "'approved' in kubernetes_scaling_workstations_csr_approval.stdout"
+
+- name: Wait for Metrics Server to be Ready
+  become: true
+  kubernetes.core.k8s_info:
+    api_version: apiregistration.k8s.io/v1
+    kind: APIService
+    name: v1beta1.metrics.k8s.io
+    kubeconfig: /etc/kubernetes/admin.conf
+    wait: true
+    wait_condition:
+      type: Available
+      status: "True"
+    wait_timeout: 60

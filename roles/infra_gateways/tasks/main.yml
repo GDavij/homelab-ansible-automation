@@ -1,11 +1,16 @@
+---
+- name: Setup Internal Host DNS on /etc/hosts
+  ansible.builtin.include_tasks:
+    file: setup-internal-host-dns.yml
+
 - name: Create Docker core_net for Core Infrastructure Services
   community.docker.docker_network:
     name: core_net
     state: present
     driver: bridge
     ipam_config:
-      - subnet: 172.20.0.0/24
-        gateway: 172.20.0.1
+      - subnet: "{{ docker_core_net_cidr }}"
+        gateway: "{{ docker_core_net_gateway }}"
   become: true
   tags:
     - infra_gateways
@@ -16,8 +21,8 @@
     state: present
     driver: bridge
     ipam_config:
-      - subnet: 172.21.0.0/24
-        gateway: 172.21.0.1
+      - subnet: "{{ docker_proxy_net_cidr }}"
+        gateway: "{{ docker_proxy_net_gateway }}"
   become: true
   tags:
     - infra_gateways
@@ -44,7 +49,7 @@
 
 - name: Build Traefik Dynamic Config J2 Template
   ansible.builtin.template:
-    src: templates/traefik-dynamic.yml.j2
+    src: traefik_dynamic.gateways.yml.j2
     dest: /opt/core/traefik/dynamic/traefik-dynamic.yml
     mode: '0644'
   become: true
@@ -53,7 +58,7 @@
 
 - name: Build Infrastructure Services Docker Compose
   ansible.builtin.template:
-    src: templates/infra_services.compose.yml.j2
+    src: infra_services.gateways.compose.yml.j2
     dest: /composes/infra_core_services.compose.yml
     mode: '0644'
   become: true
@@ -62,7 +67,7 @@
 
 - name: Generate AdGuard config in conf directory (prevents setup wizard)
   ansible.builtin.template:
-    src: templates/adguard.yml.j2
+    src: adguard_config.gateways.yml.j2
     dest: /opt/core/adguard/conf/AdGuardHome.yaml
     owner: 999  # AdGuard default UID
     group: 999
@@ -89,7 +94,19 @@
     project_name: infra_core_services
     pull: missing
     remove_orphans: true
-    recreate: always  # Always recreate containers to guarantee consistency
+    recreate: always
+  become: true
+  tags:
+    - infra_gateways
+
+- name: Verify Core Infrastructure Services are Healthy
+  ansible.builtin.command:
+    cmd: docker compose -f /composes/infra_core_services.compose.yml ps --format json
+  register: infra_gateways_health
+  changed_when: false
+  retries: 6
+  delay: 10
+  until: "'unhealthy' not in infra_gateways_health.stdout"
   become: true
   tags:
     - infra_gateways

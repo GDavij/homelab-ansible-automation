@@ -1,0 +1,35 @@
+---
+- name: "Install Traefik CRD"
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    src: "https://raw.githubusercontent.com/traefik/traefik/{{ traefik_version }}/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml"
+    kubeconfig: /etc/kubernetes/admin.conf
+
+- name: "Copy Traefik Manifest to Workstation"
+  ansible.builtin.template:
+    src: "traefik_ingress.k8s.yml.j2"
+    dest: "/tmp/traefik_ingress.k8s.yml"
+    mode: '0644'
+  become: true
+
+- name: "Apply Traefik Manifest"
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    src: /tmp/traefik_ingress.k8s.yml
+    kubeconfig: /etc/kubernetes/admin.conf
+
+- name: "Wait for Traefik Deployment to be Ready"
+  become: true
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: traefik
+    namespace: kube-system
+    kubeconfig: /etc/kubernetes/admin.conf
+    wait: true
+    wait_condition:
+      type: Available
+      status: "True"
+    wait_timeout: 120

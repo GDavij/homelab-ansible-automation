@@ -1,0 +1,12 @@
+---
+galaxy_info:
+  author: gdavij
+  description: "SSH hardening, system user management, and sudo configuration"
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions: [bookworm]
+    - name: Fedora
+      versions: [all]
+dependencies: []

@@ -1,3 +1,4 @@
+---
 - name: Check if Root CA already exists
   ansible.builtin.stat:
     path: "{{ pki_output_folder }}/authorities/root-ca.crt"
@@ -80,7 +81,7 @@
         certificate_path: "{{ pki_output_folder }}/authorities/root-ca.crt"
         privatekey_path: "{{ pki_output_folder }}/authorities/root-ca.key"
         friendly_name: "Homelab Root CA"
-        passphrase: "homelab"
+        passphrase: "{{ root_certificate_secret }}"
         mode: '0644'
       delegate_to: localhost
       become: false

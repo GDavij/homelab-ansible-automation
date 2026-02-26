@@ -1,3 +1,4 @@
+---
 - name: Setup default ssh folders
   ansible.builtin.file:
     path: "{{ ssh_keys_dir }}"
@@ -86,7 +87,7 @@
 - name: Check if SSH keys already exist and are deployed
   ansible.builtin.stat:
     path: "~{{ item.username }}/.ssh/authorized_keys"
-  register: ssh_keys_deployed
+  register: security_ssh_keys_deployed
   become: true
   loop: "{{ system_users }}"
   loop_control:
@@ -97,10 +98,10 @@
 - name: Verify SSH Key Authentication Works (only if keys exist)
   ansible.builtin.command:
     cmd: >-
-      ssh -o PasswordAuthentication=no -o ConnectTimeout=10 
-      -o StrictHostKeyChecking=no 
-      -i {{ ssh_keys_dir }}/{{ item.username }}_id_ed25519 
-      {{ item.username }}@{{ ansible_default_ipv4.address }} 
+      ssh -o PasswordAuthentication=no -o ConnectTimeout=10
+      -o StrictHostKeyChecking=no
+      -i {{ ssh_keys_dir }}/{{ item.username }}_id_ed25519
+      {{ item.username }}@{{ ansible_default_ipv4.address }}
       'echo "SSH key auth working for {{ item.username }}"'
   delegate_to: localhost
   become: false
@@ -113,7 +114,7 @@
   changed_when: false
   when:
     - item.state | default('present') != 'absent'
-    - ssh_keys_deployed.results[user_index].stat.exists | default(false)
+    - security_ssh_keys_deployed.results[user_index].stat.exists | default(false)
 
 - name: Fail if SSH Key Authentication Not Working (only for existing deployments)
   ansible.builtin.fail:

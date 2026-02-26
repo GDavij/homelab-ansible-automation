@@ -1,3 +1,4 @@
+---
 - name: Install Firewalld and Python Adapter if not exists
   ansible.builtin.package:
     name:

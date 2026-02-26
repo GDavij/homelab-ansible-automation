@@ -1,9 +1,4 @@
-# AdGuard Home Configuration Variables
-adguard_username: "gatekeeper"
-# Pre-generated bcrypt hash for password "changeme" (rounds=12)
-# Generated using: python3 generate_adguard_password.py
-adguard_password_hash: "$2b$12$JA8MBJtr4lkUJijw2d9BeOEI4x.S4n4o.dqTWZdi9BlBfeirytl6G"
-
+---
 # AdGuard DNS Settings
 adguard_upstream_dns:
   - "1.1.1.1"
@@ -28,3 +23,56 @@ adguard_filters:
   - enabled: true
     url: "https://adguardteam.github.io/HostlistsRegistry/assets/filter_2.txt"
     name: "AdAway Default Blocklist"
+
+adguard_rewrites:
+  - name: adguard
+    dns: "dns.lab"
+    description: DNS Authority
+    ip: "{{ gateway_core_station_ip }}"
+
+  - name: traefik
+    dns: gateway.lab
+    description: Gateway Proxy
+    credential_certificate: true
+    ip: "{{ gateway_core_station_ip }}"
+
+  - name: upsnap-proxy
+    dns: snap.lab
+    description: Upsnap GhostTunnel Proxy Certificate
+    ip: "{{ gateway_core_station_ip }}"
+
+  - name: memos
+    dns: daily.lab
+    description: Memos Host, Fleeting Notes/Daily Journal
+    ip: "{{ gateway_core_station_ip }}"
+
+  - name: maybe-finance
+    dns: finance.lab
+    description: Maybe Finance GhostTunnel Proxy Certificate
+    ip: "{{ gateway_core_station_ip }}"
+
+  - name: trilium
+    dns: brain.lab
+    description: Trilium Host, Personal Knowledge Base
+    ip: "{{ gateway_core_station_ip }}"
+
+  - name: K8s NLB Proxy
+    dns: nlb.k8s.monster.lab
+    description: Split-Horizon DNS - Kubernetes API Server via NLB
+    ip: "{{ gateway_core_station_ip }}"
+
+  - name: K8s Services Ingress
+    dns: "*.svc.k8s.monster.lab"
+    description: Split-Horizon DNS - Kubernetes Service FQDNs via Gateway Traefik
+    ip: "{{ gateway_core_station_ip }}"
+
+  - name: K8s Ingress Wildcard
+    dns: "*.k8s.monster.lab"
+    description: Split-Horizon DNS - Kubernetes Ingress Wildcard via Gateway Traefik
+    ip: "{{ gateway_core_station_ip }}"
+
+bastion_internal_hosts_dns:
+  - name: Monster Workstation Machine
+    dns: "k8s.monster.internal"
+    description: Wildcard DNS for Monster Host Access via Traefik TCP Routing
+    ip: "{{ workstation_core_station_ip }}"

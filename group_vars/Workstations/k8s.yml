@@ -1,0 +1,32 @@
+---
+k8s_workstation_services:
+  - name: traefik Ingress Controller HTTPS
+    description: "Port for Traefik Ingress Controller HTTPS traffic"
+    port: "443/tcp"
+
+
+# node_name is defined per-host in host_vars/<hostname>/identity.yml
+node_hostname: "{{ node_name }}-workstation"
+cluster_domain: "k8s.{{ node_name }}.lab"
+cluster_endpoint: "https://nlb.{{ cluster_domain }}"
+kubernetes_version: "1.35"
+
+nlb_cluster_hostname: "nlb.{{ cluster_domain }}"
+
+# Serviços K8s expostos via IngressRoute (Traefik)
+# Cada entrada gera: IngressRoute + ServersTransport
+# O FQDN externo segue o padrão CoreDNS: <service>.<namespace>.svc.<cluster_domain>
+k8s_ingress_services:
+  - name: argocd-server
+    namespace: argocd
+    port: 443
+    insecure_backend: true  # ArgoCD usa TLS próprio, skip verify no backend
+  - name: hubble-ui
+    namespace: kube-system
+    port: 80
+    insecure_backend: false
+
+# ArgoCD GitOps Configuration
+argocd_gitops_repo: "https://github.com/GDavij/homelab-gitops-k8s-cluster.git"
+argocd_gitops_revision: "main"
+argocd_gitops_path: "."

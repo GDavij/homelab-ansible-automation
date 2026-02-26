@@ -1,12 +1,13 @@
+---
 - name: Setup Egress Rules using Direct.xml
   ansible.builtin.copy:
-    src: direct.xml
+    src: firewall_direct.gateways.xml
     dest: /etc/firewalld/direct.xml
     owner: root
     group: root
     mode: '0640'
   become: true
-  notify: Reload_firewalld
+  notify: Reload Firewalld (Network Gateways)
   tags:
     - network_gateways
 

@@ -1,0 +1,20 @@
+---
+- name: Setup Certificates for Kubernetes Ingress Traefik
+  ansible.builtin.include_tasks:
+    file: certificates.yml
+
+- name: Install Reflector for Secret Replication
+  ansible.builtin.include_tasks:
+    file: reflector.yml
+
+- name: Deploy Shared TLS Secrets (Reflector)
+  ansible.builtin.include_tasks:
+    file: shared_secrets.yml
+
+- name: Setup Traefik Ingress Controller
+  ansible.builtin.include_tasks:
+    file: ingress_traefik.yml
+
+- name: Setup ArgoCD for GitOps Management
+  ansible.builtin.include_tasks:
+    file: argo_cd.yml

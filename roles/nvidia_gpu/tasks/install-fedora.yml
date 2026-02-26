@@ -1,0 +1,59 @@
+---
+- name: Ensure RPM Fusion Repos are active
+  ansible.builtin.dnf:
+    name:
+      - "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-{{ ansible_distribution_major_version }}.noarch.rpm"
+      - "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-{{ ansible_distribution_major_version }}.noarch.rpm"
+    state: present
+    disable_gpg_check: true
+  tags:
+    - nvidia_gpu
+
+- name: Remove community nvidia container toolkit to avoid conflicts
+  ansible.builtin.dnf:
+    name: golang-github-nvidia-container-toolkit
+    state: absent
+  tags:
+    - nvidia_gpu
+
+- name: Add official NVIDIA container toolkit repository
+  ansible.builtin.get_url:
+    url: https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo
+    dest: /etc/yum.repos.d/nvidia-container-toolkit.repo
+    mode: '0644'
+  tags:
+    - nvidia_gpu
+
+- name: Install NVIDIA Drivers and CUDA
+  ansible.builtin.dnf:
+    name:
+      - akmod-nvidia
+      - xorg-x11-drv-nvidia-cuda
+      - xorg-x11-drv-nvidia-cuda-libs
+      - nvidia-container-toolkit
+    state: present
+    update_cache: true
+  notify:
+    - Build Akmods
+    - Reboot Workstation
+  tags:
+    - nvidia_gpu
+
+- name: Force immediate build and reboot
+  ansible.builtin.meta: flush_handlers
+  tags:
+    - nvidia_gpu
+
+- name: Verify NVIDIA Driver Installation
+  ansible.builtin.command: nvidia-smi
+  register: nvidia_gpu_nvidia_smi_output
+  changed_when: false
+  tags:
+    - nvidia_gpu
+
+- name: Display NVIDIA Driver Information
+  ansible.builtin.debug:
+    msg: "{{ nvidia_gpu_nvidia_smi_output.stdout }}"
+  when: nvidia_gpu_nvidia_smi_output.rc == 0
+  tags:
+    - nvidia_gpu

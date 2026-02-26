@@ -1,0 +1,34 @@
+---
+- name: Install iSCSI Packages
+  ansible.builtin.package:
+    name:
+      - iscsi-initiator-utils
+      - nfs-utils
+      - util-linux
+    state: present
+  become: true
+
+- name: Enable iSCSI
+  ansible.builtin.systemd:
+    name: "iscsid"
+    enabled: true
+    state: started
+  become: true
+
+- name: Disable multipathd
+  ansible.builtin.systemd:
+    name: "multipathd"
+    enabled: false
+    state: stopped
+  become: true
+
+- name: Verify initiatorname has been generated
+  ansible.builtin.stat:
+    path: /etc/iscsi/initiatorname.iscsi
+  register: kubernetes_storage_workstations_initiatorname_stat
+  become: true
+
+- name: Fail if initiatorname.iscsi is not generated
+  ansible.builtin.fail:
+    msg: "iSCSI initiatorname file was not generated at /etc/iscsi/initiatorname.iscsi"
+  when: not kubernetes_storage_workstations_initiatorname_stat.stat.exists

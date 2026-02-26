@@ -1,0 +1,19 @@
+---
+- name: Build Cluster Root CA Secrets Manifest
+  ansible.builtin.template:
+    src: ca_secrets.k8s.yml.j2
+    dest: /tmp/ca_secrets.k8s.yml
+    mode: '0600'
+
+- name: Apply CA Secret to Monster Cluster
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    src: /tmp/ca_secrets.k8s.yml
+    kubeconfig: /etc/kubernetes/admin.conf
+
+- name: Security Cleanup
+  ansible.builtin.file:
+    path: /tmp/cluster-ca-secret.yaml
+    state: absent
+  become: true

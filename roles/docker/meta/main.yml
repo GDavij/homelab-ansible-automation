@@ -1,0 +1,13 @@
+---
+galaxy_info:
+  author: gdavij
+  description: "Docker Engine installation and Python Docker SDK setup"
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions: [bookworm]
+    - name: Fedora
+      versions: [all]
+dependencies:
+  - role: geerlingguy.docker

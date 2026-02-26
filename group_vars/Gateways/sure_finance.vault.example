@@ -1,0 +1,9 @@
+---
+sure_finance:
+   postgres:
+      user: change_to_a_good_username
+      password: "change_to_a_strong_password"  # Sha512 would be a good idea
+      db: sure_db  # You can change if you want to, recomend the default or sure_db_prod
+
+   system:
+      secret_key_base: "change_to_a_long_random_string_for_secret_key"  # Also Sha512 would be a good Idea

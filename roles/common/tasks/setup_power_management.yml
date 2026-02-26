@@ -1,3 +1,4 @@
+---
 - name: "Disable System Suspend and Sleep"
   ansible.builtin.systemd:
     name: "{{ item }}"
@@ -17,7 +18,7 @@
 - name: "Check if logind.conf exists"
   ansible.builtin.stat:
     path: /etc/systemd/logind.conf
-  register: logind_conf_stat
+  register: common_logind_conf_stat
   tags:
     - common
     - essential
@@ -36,7 +37,7 @@
     - { key: "IdleActionSec", value: "0" }
   become: true
   notify: Restart systemd-logind
-  when: logind_conf_stat.stat.exists
+  when: common_logind_conf_stat.stat.exists
   tags:
     - common
     - essential

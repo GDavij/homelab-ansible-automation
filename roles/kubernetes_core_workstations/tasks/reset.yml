@@ -1,0 +1,40 @@
+---
+- name: Stop Kubelet Service
+  ansible.builtin.systemd:
+    name: kubelet
+    state: stopped
+  become: true
+
+- name: "Force Kill Port 6443"
+  ansible.builtin.shell: "fuser -k -9 6443/tcp || true"
+  changed_when: true
+  become: true
+
+- name: "Reset KubeAdm configuration"
+  ansible.builtin.command: kubeadm reset -f
+  changed_when: true
+  become: true
+
+- name: Stop Containerd for cleanup
+  ansible.builtin.systemd:
+    name: containerd
+    state: stopped
+  become: true
+
+- name: "Remove all State from Kubernetes"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/kubernetes/manifests
+    - /var/lib/etcd
+    - /var/lib/kubelet
+    - /etc/kubernetes/pki
+  become: true
+
+- name: Restart Containerd for new installation
+  ansible.builtin.systemd:
+    name: containerd
+    state: started
+    enabled: true
+  become: true

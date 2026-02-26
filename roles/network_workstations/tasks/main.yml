@@ -1,3 +1,4 @@
+---
 - name: Remove any UFW Configuration
   ansible.builtin.include_tasks:
    file: disable-ufw.yml

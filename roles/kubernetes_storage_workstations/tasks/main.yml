@@ -1,0 +1,8 @@
+---
+- name: Setup iSCI for Disk Management
+  ansible.builtin.include_tasks:
+    file: isci.yml
+
+- name: Deploy Longhorn Storage System
+  ansible.builtin.include_tasks:
+    file: longhorn.yml

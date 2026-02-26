@@ -1,0 +1,20 @@
+---
+profile: production
+project_dir: .
+
+exclude_paths:
+  - galaxy_roles/
+  - collections/
+  - .git/
+  - retry/
+  - scripts/
+  - .serena/
+  - roles/*/files/
+  - roles/*/templates/
+
+skip_list:
+  - galaxy[no-changelog]
+  - galaxy[no-runtime]
+
+warn_list:
+  - command-instead-of-shell

@@ -1,0 +1,14 @@
+---
+- name: Upload K8s Ingress certificate
+  ansible.builtin.copy:
+    src: "{{ pki_output_folder }}/kubernetes-ingress-traefik.crt"
+    dest: "/etc/kubernetes/pki/kubernetes-ingress-traefik.crt"
+    mode: '0644'
+  become: true
+
+- name: Upload K8s Ingress Certificate Key
+  ansible.builtin.copy:
+    src: "{{ pki_output_folder }}/kubernetes-ingress-traefik.key"
+    dest: "/etc/kubernetes/pki/kubernetes-ingress-traefik.key"
+    mode: '0600'
+  become: true

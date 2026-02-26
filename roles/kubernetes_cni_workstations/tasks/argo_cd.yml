@@ -1,0 +1,73 @@
+---
+- name: "Create ArgoCD Namespace"
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    kind: Namespace
+    name: argocd
+    kubeconfig: /etc/kubernetes/admin.conf
+
+- name: "Wait for Reflector to Replicate TLS Secret to ArgoCD Namespace"
+  become: true
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: "{{ node_name }}-server-cert"
+    namespace: argocd
+    kubeconfig: /etc/kubernetes/admin.conf
+  register: kubernetes_cni_workstations_argocd_secret
+  until: kubernetes_cni_workstations_argocd_secret.resources | length > 0
+  retries: 30
+  delay: 5
+
+- name: "Build ArgoCD IngressRoute Manifest"
+  ansible.builtin.template:
+    dest: "/tmp/argocd.k8s.yml"
+    src: "argocd.k8s.yml.j2"
+    mode: '0644'
+  become: true
+
+- name: "Apply ArgoCD IngressRoutes and mTLS Config"
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    src: /tmp/argocd.k8s.yml
+    kubeconfig: /etc/kubernetes/admin.conf
+
+- name: "Install ArgoCD (Server-Side Apply)"
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    src: "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
+    namespace: argocd
+    server_side_apply:
+      field_manager: ansible
+    kubeconfig: /etc/kubernetes/admin.conf
+
+- name: "Wait for ArgoCD Server to be Ready"
+  become: true
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: argocd-server
+    namespace: argocd
+    kubeconfig: /etc/kubernetes/admin.conf
+    wait: true
+    wait_condition:
+      type: Available
+      status: "True"
+    wait_timeout: 120
+
+- name: "Build ArgoCD GitOps Manifest"
+  ansible.builtin.template:
+    dest: "/tmp/argocd_gitops.k8s.yml"
+    src: "argocd_gitops.k8s.yml.j2"
+    mode: '0644'
+  become: true
+
+- name: "Apply ArgoCD GitOps (AppProject + Application)"
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    src: /tmp/argocd_gitops.k8s.yml
+    kubeconfig: /etc/kubernetes/admin.conf

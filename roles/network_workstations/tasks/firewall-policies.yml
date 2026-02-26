@@ -1,3 +1,4 @@
+---
 - name: Define Underlay Zone
   ansible.posix.firewalld:
     zone: underlay_network
@@ -5,9 +6,18 @@
     permanent: true
   become: true
   notify:
-    - Reload_firewalld
+    - Reload Firewalld (Network Workstations)
   tags:
     - network_workstations
+
+- name: Set Underlay Zone as Default zone on Workstation
+  ansible.builtin.command:
+    cmd: firewall-cmd --set-default-zone=underlay_network
+  register: network_workstations_default_zone_check
+  changed_when: "'already set' not in network_workstations_default_zone_check.stdout"
+  become: true
+  notify:
+    - Reload Firewalld (Network Workstations)
 
 - name: Flush Handlers to register Zone now
   ansible.builtin.meta: flush_handlers
@@ -23,7 +33,15 @@
   tags:
     - network_workstations
 
-- name: Enable Masquerinding (NAT Gateway)
+- name: 🛰️ Force Zone via NetworkManager (Fedora Fix)
+  community.general.nmcli:
+    conn_name: "{{ ansible_default_ipv4.interface }}"
+    zone: underlay_network
+    state: present
+    autoconnect: true
+  become: true
+
+- name: Enable Masquerading (NAT Gateway)
   ansible.posix.firewalld:
     zone: underlay_network
     masquerade: true

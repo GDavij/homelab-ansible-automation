@@ -1,0 +1,64 @@
+{# IngressRoutes e mTLS para serviços K8s expostos via Traefik.
+   Os Secrets (TLS cert + CA trust) são gerenciados pelo Reflector
+   e replicados automaticamente do kube-system para todos os namespaces. #}
+
+{# --- TLSOption mTLS por namespace (referencia o secret replicado pelo Reflector) --- #}
+{% set seen_namespaces = [] %}
+{% for svc in k8s_ingress_services %}
+{% if svc.namespace not in seen_namespaces %}
+{% set _ = seen_namespaces.append(svc.namespace) %}
+---
+apiVersion: traefik.io/v1alpha1
+kind: TLSOption
+metadata:
+  name: mtls-strict
+  namespace: {{ svc.namespace }}
+spec:
+  minVersion: VersionTLS12
+  clientAuth:
+    clientAuthType: RequireAndVerifyClientCert
+    secretNames:
+      - {{ node_name }}-ca-trust
+
+{% endif %}
+{% endfor %}
+
+{# --- ServersTransport + IngressRoute por serviço --- #}
+{% for svc in k8s_ingress_services %}
+{% if svc.insecure_backend | default(false) %}
+---
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: {{ svc.name }}-transport
+  namespace: {{ svc.namespace }}
+spec:
+  serverName: {{ svc.name }}
+  insecureSkipVerify: true
+
+{% endif %}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ svc.name }}
+  namespace: {{ svc.namespace }}
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`{{ svc.name }}.{{ svc.namespace }}.svc.{{ cluster_domain }}`)
+      kind: Rule
+      services:
+        - name: {{ svc.name }}
+          port: {{ svc.port }}
+{% if svc.insecure_backend | default(false) %}
+          serversTransport: {{ svc.name }}-transport
+{% endif %}
+  tls:
+    secretName: {{ node_name }}-server-cert
+    options:
+      name: mtls-strict
+      namespace: {{ svc.namespace }}
+
+{% endfor %}

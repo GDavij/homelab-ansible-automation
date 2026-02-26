@@ -19,8 +19,8 @@
     permanent: true
     immediate: true
   loop:
-    - 'rule family="ipv4" source address="172.20.0.0/24" port port="8443" protocol="tcp" accept'
-    - 'rule family="ipv4" source address="172.21.0.0/24" port port="8443" protocol="tcp" accept'
+    - 'rule family="ipv4" source address="{{ docker_core_net_cidr }}" port port="8443" protocol="tcp" accept'
+    - 'rule family="ipv4" source address="{{ docker_proxy_net_cidr }}" port port="8443" protocol="tcp" accept'
     - 'rule family="ipv4" port port="8443" protocol="tcp" reject'
     - 'rule family="ipv4" port port="8090" protocol="tcp" reject'
   failed_when: false
@@ -38,8 +38,8 @@
     permanent: true
     immediate: true
   loop:
-    - 'rule family="ipv4" source address="172.20.0.0/24" port port="8443" protocol="tcp" accept'
-    - 'rule family="ipv4" source address="172.21.0.0/24" port port="8443" protocol="tcp" accept'
+    - 'rule family="ipv4" source address="{{ docker_core_net_cidr }}" port port="8443" protocol="tcp" accept'
+    - 'rule family="ipv4" source address="{{ docker_proxy_net_cidr }}" port port="8443" protocol="tcp" accept'
     - 'rule family="ipv4" port port="8443" protocol="tcp" reject'
     - 'rule family="ipv4" port port="8090" protocol="tcp" reject'
   failed_when: false
@@ -59,12 +59,12 @@
 - name: Allow Traefik to access Upsnap proxy (8443) from Docker core network on underlay
   ansible.posix.firewalld:
     zone: underlay_network
-    rich_rule: 'rule family="ipv4" source address="172.20.0.0/24" port port="8443" protocol="tcp" accept'
+    rich_rule: 'rule family="ipv4" source address="{{ docker_core_net_cidr }}" port port="8443" protocol="tcp" accept'
     state: enabled
     permanent: true
     immediate: true
   become: true
-  notify: Reload_firewalld
+  notify: Reload Firewalld (Infra Gateways)
   tags:
     - infra_gateways
     - upsnap
@@ -73,12 +73,12 @@
 - name: Allow Traefik to access Upsnap proxy (8443) from Docker proxy network on underlay
   ansible.posix.firewalld:
     zone: underlay_network
-    rich_rule: 'rule family="ipv4" source address="172.21.0.0/24" port port="8443" protocol="tcp" accept'
+    rich_rule: 'rule family="ipv4" source address="{{ docker_proxy_net_cidr }}" port port="8443" protocol="tcp" accept'
     state: enabled
     permanent: true
     immediate: true
   become: true
-  notify: Reload_firewalld
+  notify: Reload Firewalld (Infra Gateways)
   tags:
     - infra_gateways
     - upsnap
@@ -92,7 +92,7 @@
     permanent: true
     immediate: true
   become: true
-  notify: Reload_firewalld
+  notify: Reload Firewalld (Infra Gateways)
   tags:
     - infra_gateways
     - upsnap
@@ -106,7 +106,7 @@
     permanent: true
     immediate: true
   become: true
-  notify: Reload_firewalld
+  notify: Reload Firewalld (Infra Gateways)
   tags:
     - infra_gateways
     - upsnap
@@ -119,12 +119,12 @@
 - name: Allow Traefik to access Upsnap proxy (8443) from Docker core network on ZTN
   ansible.posix.firewalld:
     zone: ztn_network
-    rich_rule: 'rule family="ipv4" source address="172.20.0.0/24" port port="8443" protocol="tcp" accept'
+    rich_rule: 'rule family="ipv4" source address="{{ docker_core_net_cidr }}" port port="8443" protocol="tcp" accept'
     state: enabled
     permanent: true
     immediate: true
   become: true
-  notify: Reload_firewalld
+  notify: Reload Firewalld (Infra Gateways)
   tags:
     - infra_gateways
     - upsnap
@@ -133,12 +133,12 @@
 - name: Allow Traefik to access Upsnap proxy (8443) from Docker proxy network on ZTN
   ansible.posix.firewalld:
     zone: ztn_network
-    rich_rule: 'rule family="ipv4" source address="172.21.0.0/24" port port="8443" protocol="tcp" accept'
+    rich_rule: 'rule family="ipv4" source address="{{ docker_proxy_net_cidr }}" port port="8443" protocol="tcp" accept'
     state: enabled
     permanent: true
     immediate: true
   become: true
-  notify: Reload_firewalld
+  notify: Reload Firewalld (Infra Gateways)
   tags:
     - infra_gateways
     - upsnap
@@ -152,7 +152,7 @@
     permanent: true
     immediate: true
   become: true
-  notify: Reload_firewalld
+  notify: Reload Firewalld (Infra Gateways)
   tags:
     - infra_gateways
     - upsnap
@@ -166,7 +166,7 @@
     permanent: true
     immediate: true
   become: true
-  notify: Reload_firewalld
+  notify: Reload Firewalld (Infra Gateways)
   tags:
     - infra_gateways
     - upsnap

@@ -1,0 +1,4 @@
+---
+- name: Setup NVIDIA GPU Support for Kubernetes Workstations
+  ansible.builtin.include_tasks:
+    file: nvidia_gpu.yml

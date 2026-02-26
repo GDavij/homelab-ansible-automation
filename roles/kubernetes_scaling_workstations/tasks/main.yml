@@ -1,0 +1,8 @@
+---
+- name: Setup Metrics Server
+  ansible.builtin.include_tasks:
+    file: metrics_server.yml
+
+- name: Setup Cluster Autoscaler for VPA
+  ansible.builtin.include_tasks:
+    file: autoscaler.yml

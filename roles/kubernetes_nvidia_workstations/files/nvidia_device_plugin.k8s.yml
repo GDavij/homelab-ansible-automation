@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-device-plugin-daemonset
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: nvidia-device-plugin-ds
+  template:
+    metadata:
+      labels:
+        name: nvidia-device-plugin-ds
+    spec:
+      serviceAccountName: nvidia-device-plugin
+      automountServiceAccountToken: false
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      
+      runtimeClassName: nvidia 
+      priorityClassName: system-node-critical
+      
+      containers:
+      - image: nvcr.io/nvidia/k8s-device-plugin:v0.14.5
+        name: nvidia-device-plugin-ctr
+        args: ["--config-file=/etc/kubernetes/devplugin/config.yaml"]
+        env:
+          - name: FAIL_ON_INIT_ERROR
+            value: "true"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+            ephemeral-storage: 50Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+            ephemeral-storage: 100Mi
+        volumeMounts:
+          - name: device-plugin
+            mountPath: /var/lib/kubelet/device-plugins
+          - name: config-volume
+            mountPath: /etc/kubernetes/devplugin
+      volumes:
+        - name: device-plugin
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
+        - name: config-volume
+          configMap:
+            name: nvidia-device-plugin-config

@@ -1,3 +1,4 @@
+---
 - name: Force Update Apt Cache (Debian)
   ansible.builtin.apt:
     update_cache: true
@@ -33,6 +34,9 @@
       - gnupg
       - openssl
       - kitty-terminfo
+      - pciutils
+      - jq
+      - python3-pip
 
     common_os_specific_packages: >-
       {{

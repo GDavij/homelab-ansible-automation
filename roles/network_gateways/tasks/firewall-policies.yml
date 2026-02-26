@@ -1,3 +1,4 @@
+---
 - name: Define Underlay Zone
   ansible.posix.firewalld:
     zone: underlay_network
@@ -5,7 +6,7 @@
     permanent: true
   become: true
   notify:
-    - Reload_firewalld
+    - Reload Firewalld (Network Gateways)
   tags:
     - network_gateways
 
@@ -23,7 +24,7 @@
   tags:
     - network_gateways
 
-- name: Enable Masquerinding (NAT Gateway)
+- name: Enable Masquerading (NAT Gateway)
   ansible.posix.firewalld:
     zone: underlay_network
     masquerade: true

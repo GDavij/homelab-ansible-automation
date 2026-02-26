@@ -1,0 +1,4 @@
+---
+# Host-specific identity for this workstation node.
+# Change this value when provisioning a different machine.
+node_name: "monster"

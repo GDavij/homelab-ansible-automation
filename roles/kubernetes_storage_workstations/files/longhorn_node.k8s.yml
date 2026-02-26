@@ -1,0 +1,29 @@
+---
+# Longhorn Node Disk Configuration
+# Configures disk tags for StorageClass selectors (ssd / hdd)
+# SSD: Root filesystem (RAID0 XFS) at /var/lib/longhorn
+# HDD: Cold storage (XFS) at /cold-storage/longhorn
+
+apiVersion: longhorn.io/v1beta2
+kind: Node
+metadata:
+  name: monster-workstation
+  namespace: longhorn-system
+spec:
+  name: monster-workstation
+  allowScheduling: true
+  tags:
+    - workstation
+  disks:
+    ssd:
+      path: /var/lib/longhorn
+      allowScheduling: true
+      storageReserved: 21474836480  # 20Gi reserved for system
+      tags:
+        - ssd
+    hdd:
+      path: /cold-storage/longhorn
+      allowScheduling: true
+      storageReserved: 10737418240  # 10Gi reserved for system
+      tags:
+        - hdd

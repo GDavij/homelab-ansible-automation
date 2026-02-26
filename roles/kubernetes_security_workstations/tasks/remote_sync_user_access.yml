@@ -1,0 +1,85 @@
+---
+- name: "Configure Kubernetes Access from Host"
+  become: true
+  block:
+    - name: "Ensure .kube directory exists in Home"
+      ansible.builtin.file:
+        path: "/home/{{ ansible_user }}/.kube"
+        state: directory
+        mode: '0700'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: "Copy Admin Kubeconfig from Control Plane to User's Home"
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: "/home/{{ ansible_user }}/.kube/config"
+        remote_src: true
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+
+    - name: "Slurp Admin Kubeconfig for Remote Access Config Generation"
+      ansible.builtin.slurp:
+        src: /etc/kubernetes/admin.conf
+      register: kubernetes_security_workstations_admin_kubeconfig_raw
+
+- name: "Configure Remote Access from Controller using PKI Client Certificates"
+  become: false
+  delegate_to: localhost
+  vars:
+    pki_dir: "{{ playbook_dir }}/.pki_output"
+    cluster_name: "{{ node_name }}"
+  block:
+    - name: "Ensure .kube directory exists in Controller Home"
+      ansible.builtin.file:
+        path: "{{ lookup('env', 'HOME') }}/.kube"
+        state: directory
+        mode: '0700'
+
+    - name: "Read Root CA Certificate for Kubeconfig"
+      ansible.builtin.slurp:
+        src: "{{ pki_dir }}/authorities/root-ca.crt"
+      register: kubernetes_security_workstations_ca_cert_raw
+
+    - name: "Read Client Certificates for each PKI Device"
+      ansible.builtin.slurp:
+        src: "{{ pki_dir }}/user_certs/{{ item.name }}.crt"
+      register: kubernetes_security_workstations_client_certs_raw
+      loop: "{{ pki_client_devices }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: "Read Client Keys for each PKI Device"
+      ansible.builtin.slurp:
+        src: "{{ pki_dir }}/user_certs/{{ item.name }}.key"
+      register: kubernetes_security_workstations_client_keys_raw
+      loop: "{{ pki_client_devices }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: "Build Client Certificates Lookup Dictionary"
+      ansible.builtin.set_fact:
+        kubernetes_security_workstations_ca_cert_b64: "{{ kubernetes_security_workstations_ca_cert_raw.content }}"
+        kubernetes_security_workstations_client_certs: "{{ kubernetes_security_workstations_client_certs | default({}) | combine({item.0.item.name: {'cert': item.0.content, 'key': item.1.content}}) }}"
+      loop: "{{ kubernetes_security_workstations_client_certs_raw.results | zip(kubernetes_security_workstations_client_keys_raw.results) | list }}"
+      loop_control:
+        label: "{{ item.0.item.name }}"
+
+    - name: "Build KubeConfig for Remote Access to Cluster"
+      ansible.builtin.template:
+        src: kubeconfig_remote_access.yml.j2
+        dest: "{{ lookup('env', 'HOME') }}/.kube/{{ node_name }}.conf"
+        mode: '0600'
+
+    - name: "Source KUBECONFIG in User Shell Profiles for Auto Sourcing Configuration"
+      ansible.builtin.lineinfile:
+        path: "{{ lookup('env', 'HOME') }}/{{ item }}"
+        regexp: '^export KUBECONFIG='
+        line: 'export KUBECONFIG="$HOME/.kube/config:$HOME/.kube/{{ node_name }}.conf"'
+        state: present
+        mode: '0644'
+        create: true
+      loop:
+        - .bashrc
+        - .zshrc

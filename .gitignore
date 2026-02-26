@@ -5,14 +5,14 @@
 *.swo
 inventory.ini
 .ansible/
+.ansible_vault_pass
 
-# --- Dependências (Galaxy) ---
+# --- Dependencies (Galaxy) ---
 collections/
 vendor_roles/
 galaxy_roles/
 
-# --- Segredos & Chaves (CRÍTICO) ---
-# Ignora qualquer chave privada ou certificado que você gere localmente
+# --- Secrets & Keys ---
 *.key
 *.pem
 *.csr
@@ -20,18 +20,17 @@ galaxy_roles/
 *.p12
 .env
 
-# --- SSH & Configs Pessoais ---
-# Se você tiver configs SSH locais na pasta
+# --- SSH & Personal Configs ---
 ssh_config
 id_rsa
 id_ed25519
 
-# --- Arquivos de Sistema/Editor ---
+# --- System/Editor Files ---
 .DS_Store
 .vscode/
 .idea/
 
-
-# ---- Automation Outputs
+# --- Automation Outputs ---
 .ssh_keys
+.pki_output/
 .pki_output

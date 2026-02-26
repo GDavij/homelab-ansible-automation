@@ -1,0 +1,57 @@
+---
+- name: Download Docker Repo File
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/fedora/docker-ce.repo
+    dest: /etc/yum.repos.d/docker-ce.repo
+    mode: '0644'
+  become: true
+
+- name: Update Cache after Docker Repo addiction
+  ansible.builtin.dnf:
+    update_cache: true
+  become: true
+
+- name: Install Containerd Packages
+  ansible.builtin.package:
+    name:
+      - containerd.io
+  become: true
+
+- name: Ensure Containerd Directory Exists
+  ansible.builtin.file:
+    path: /etc/containerd
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: Enable and Start Containerd Service now
+  ansible.builtin.systemd:
+    name: containerd
+    enabled: true
+    state: started
+  become: true
+
+- name: Setup Kubernetes CRI Socket (Containerd)
+  ansible.builtin.copy:
+    dest: /etc/crictl.yaml
+    content: |
+      runtime-endpoint: unix:///run/containerd/containerd.sock
+      image-endpoint: unix:///run/containerd/containerd.sock
+      timeout: 10
+      debug: false
+    mode: '0644'
+  become: true
+
+- name: Overwrite config.toml (Base version 2.0)
+  ansible.builtin.copy:
+    src: containerd_config.toml
+    dest: /etc/containerd/config.toml
+    owner: root
+    group: root
+    mode: '0644'
+  become: true
+  tags:
+    - containerd
+
+- name: Force Restart Containerd to Apply new configurations
+  ansible.builtin.meta: flush_handlers

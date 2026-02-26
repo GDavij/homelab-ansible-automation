@@ -78,7 +78,7 @@
     other_certificates:
       - "{{ pki_output_folder }}/authorities/root-ca.crt"
     friendly_name: "{{ item.common_name }} - {{ item.description }}"
-    passphrase: "homelab"
+    passphrase: "{{ client_certificate_secret }}"
     mode: '0644'
   delegate_to: localhost
   become: false

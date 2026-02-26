@@ -1,3 +1,4 @@
+---
 - name: Setup Security foreach Gateway Machine
   hosts: Gateways
   become: true

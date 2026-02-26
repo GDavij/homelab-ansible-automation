@@ -1,0 +1,86 @@
+---
+- name: Set Cilium Variables
+  ansible.builtin.set_fact:
+    kubernetes_core_workstations_cilium_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
+    kubernetes_core_workstations_cilium_version: "v0.16.24"  # CLI Version
+    kubernetes_core_workstations_cilium_cni_version: "1.16.0"  # CNI Cluster Version
+
+- name: Check if Cilium CLI is already installed
+  ansible.builtin.command: "cilium version --client"
+  register: kubernetes_core_workstations_cilium_cli_check
+  changed_when: false
+  failed_when: false
+  become: true
+
+- name: "Install Cilium CLI"
+  when: >
+    kubernetes_core_workstations_cilium_cli_check.rc != 0 or
+    kubernetes_core_workstations_cilium_version not in kubernetes_core_workstations_cilium_cli_check.stdout
+  block:
+    - name: "Download Cilium CLI Checksum File"
+      ansible.builtin.get_url:
+        url: >-
+          https://github.com/cilium/cilium-cli/releases/download/{{ kubernetes_core_workstations_cilium_version
+          }}/cilium-linux-{{ kubernetes_core_workstations_cilium_arch }}.tar.gz.sha256sum
+        dest: "/tmp/cilium.sha256"
+        mode: '0644'
+      become: true
+
+    - name: "Read Checksum Content"
+      ansible.builtin.slurp:
+        src: "/tmp/cilium.sha256"
+      register: kubernetes_core_workstations_cilium_checksum_file
+      become: true
+
+    - name: "Download Cilium CLI Binary"
+      ansible.builtin.get_url:
+        url: >-
+          https://github.com/cilium/cilium-cli/releases/download/{{ kubernetes_core_workstations_cilium_version
+          }}/cilium-linux-{{ kubernetes_core_workstations_cilium_arch }}.tar.gz
+        dest: "/tmp/cilium-linux-{{ kubernetes_core_workstations_cilium_arch }}.tar.gz"
+        mode: '0644'
+        checksum: >-
+          sha256:{{ kubernetes_core_workstations_cilium_checksum_file['content']
+          | b64decode | split(' ') | first }}
+      become: true
+
+    - name: "Extract Cilium CLI Binary"
+      ansible.builtin.unarchive:
+        src: "/tmp/cilium-linux-{{ kubernetes_core_workstations_cilium_arch }}.tar.gz"
+        dest: "/usr/local/bin"
+        remote_src: true
+        mode: '0755'
+      become: true
+
+- name: "Install Cilium CNI Helm Installation"
+  environment:
+    KUBECONFIG: "/etc/kubernetes/admin.conf"
+  ansible.builtin.shell:
+    cmd: >
+      cilium install --version {{ kubernetes_core_workstations_cilium_cni_version }} \
+      --set cluster.name={{ node_name | lower | default('monster') }}-cluster \
+      --set ipam.operator.clusterPoolIPv4PodCIDRList="10.244.0.0/16"
+      --set hubble.peerService.clusterDomain={{ cluster_domain }}
+  become: true
+  register: kubernetes_core_workstations_cilium_install_result
+  changed_when: "'Cilium was successfully installed' in kubernetes_core_workstations_cilium_install_result.stdout"
+  failed_when:
+    - kubernetes_core_workstations_cilium_install_result.rc != 0
+    - "'already installed' not in kubernetes_core_workstations_cilium_install_result.stderr"
+
+- name: "Enable Cilium Hubble & UI"
+  environment:
+    KUBECONFIG: "/etc/kubernetes/admin.conf"
+  ansible.builtin.command:
+    cmd: >
+      cilium hubble enable --ui
+  become: true
+  register: kubernetes_core_workstations_cilium_hubble_result
+  changed_when: "'Hubble was successfully enabled' in kubernetes_core_workstations_cilium_hubble_result.stdout"
+  failed_when:
+    - kubernetes_core_workstations_cilium_hubble_result.rc != 0
+    - "'already enabled' not in kubernetes_core_workstations_cilium_hubble_result.stderr"
+  notify: Restart Cilium Agents
+
+- name: Flush Handlers to Apply Cilium Changes immediately
+  ansible.builtin.meta: flush_handlers

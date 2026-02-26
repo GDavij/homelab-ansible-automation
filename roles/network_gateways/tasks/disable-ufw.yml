@@ -1,3 +1,4 @@
+---
 - name: Disable and Stop UFW (If service exists)
   ansible.builtin.service:
     name: ufw
@@ -5,12 +6,12 @@
     enabled: false
   become: true
   ignore_errors: true
-  register: ufw_stop_result
-  failed_when: 
-    - ufw_stop_result.failed
-    - "'Could not find the requested service' not in ufw_stop_result.msg"
+  register: network_gateways_ufw_stop_result
+  failed_when:
+    - network_gateways_ufw_stop_result.failed
+    - "'Could not find the requested service' not in network_gateways_ufw_stop_result.msg"
   tags:
-    - network_workstations
+    - network_gateways
 
 - name: Uninstall UFW package
   ansible.builtin.package:
@@ -18,4 +19,4 @@
     state: absent
   become: true
   tags:
-    - network_workstations
+    - network_gateways

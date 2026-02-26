@@ -1,3 +1,4 @@
+---
 default_timezone: "America/Sao_Paulo"
 
 default_locales:
@@ -20,33 +21,41 @@ pki_services:
   - name: adguard
     dns: "dns.lab"
     description: DNS Authority
-    ip: 192.168.1.77
+    ip: "{{ gateway_core_station_ip }}"
 
   - name: traefik
     dns: gateway.lab
     description: Gateway Proxy
     credential_certificate: true
-    ip: 192.168.1.77
+    ip: "{{ gateway_core_station_ip }}"
 
   - name: upsnap
     dns: snap.lab
     description: Wakeup on Lan Host
-    ip: 192.168.1.77
+    ip: "{{ gateway_core_station_ip }}"
 
   - name: memos
     dns: daily.lab
     description: Memos Host, Fleeting Notes/Daily Journal
-    ip: 192.168.1.77
+    ip: "{{ gateway_core_station_ip }}"
 
   - name: sure-finance
     dns: finance.lab
     description: Sure Finance Host, Financial Control
-    ip: 192.168.1.77
+    ip: "{{ gateway_core_station_ip }}"
 
   - name: trilium
     dns: brain.lab
     description: Trilium Host, Personal Knowledge Base
-    ip: 192.168.1.77
+    ip: "{{ gateway_core_station_ip }}"
+
+  - name: kubernetes-ingress-traefik
+    dns: "*.k8s.monster.lab"
+    dns_alt:
+      - "argocd-server.argocd.svc.k8s.monster.lab"
+      - "hubble-ui.kube-system.svc.k8s.monster.lab"
+    description: Kubernetes Ingress Controller (Traefik)
+    ip: "{{ workstation_core_station_ip }}"
 
 # SSH Key Management
 ssh_keys_dir: "{{ playbook_dir }}/.ssh_keys/{{ inventory_hostname }}"
@@ -68,3 +77,15 @@ docker_install_compose_plugin: true
 docker_compose_package_state: present
 
 enable_tailscale: false
+
+# Shared Network Configuration
+subnet_cidr: "{{ network_subnet_cidr }}"
+
+# Docker Network CIDRs (used by gateway Docker Compose services)
+docker_core_net_cidr: "172.20.0.0/24"
+docker_core_net_gateway: "172.20.0.1"
+docker_proxy_net_cidr: "172.21.0.0/24"
+docker_proxy_net_gateway: "172.21.0.1"
+
+# Traefik version (shared between gateway Docker Compose and K8s ingress)
+traefik_version: "v3.6.6"

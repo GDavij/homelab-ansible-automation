@@ -1,0 +1,47 @@
+---
+- name: Open Control Plane Ingress Ports
+  ansible.posix.firewalld:
+    port: "{{ item }}"
+    zone: underlay_network
+    state: enabled
+    permanent: true
+    immediate: true
+  loop:
+    - 6443/tcp      # Kubernetes API Server
+    - 2379-2380/tcp  # ETCD Server API
+    - 10250/tcp     # Kubelet API
+    - 10259/tcp     # Kube Scheduler
+    - 10257/tcp     # Kube Controller Manager
+    - 4443/tcp      # Metrics Server (Limpo e sem o ']')
+    - 8443/tcp      # Admission Webhooks (ArgoCD/Cert-Manager)
+  become: true
+
+- name: Trust internal Interfaces CIDRs (Internal Only)
+  ansible.posix.firewalld:
+    zone: underlay_network
+    rich_rule: 'rule family=ipv4 source address={{ item }} accept'
+    state: enabled
+    permanent: true
+    immediate: true
+  loop:
+    - "192.168.0.0/16"  # Calico Forwarding
+    - "10.96.0.0/12"  # Kuberneters Service Network
+  become: true
+
+- name: Trust IPIP Protocol for Calico Forwarding over IPV4 (Internal Only)
+  ansible.posix.firewalld:
+    zone: underlay_network
+    rich_rule: 'rule family=ipv4 protocol value="ipip" accept'
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+
+- name: Open Services Ports for Hosting Services (Example. Postgres, SonarQube, APIs, and so on)
+  ansible.posix.firewalld:
+    port: "{{ item.port }}"
+    zone: underlay_network
+    permanent: true
+    state: enabled
+  loop: "{{ k8s_workstation_services }}"
+  become: true

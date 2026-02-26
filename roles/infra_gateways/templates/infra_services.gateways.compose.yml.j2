@@ -1,0 +1,146 @@
+services:
+  gateway:
+    image: traefik:{{ traefik_version }}
+    container_name: gateway
+    restart: unless-stopped
+    expose:
+      - 80
+      - 443
+      - 8080
+      
+    ports:
+      - "80:80"
+      - "443:443"
+      
+    networks: 
+      - core_net
+      - proxy_net
+    
+    command:
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # Security disabled for Trillium Notes usage
+      - "--entrypoints.websecure.http.encodedCharacters.allowEncodedSlash=true"
+      - "--entrypoints.websecure.http.encodedCharacters.allowEncodedBackSlash=true"
+      - "--entrypoints.websecure.http.encodedCharacters.allowEncodedNullCharacter=true"
+      - "--entrypoints.websecure.http.encodedCharacters.allowEncodedSemicolon=true"
+      - "--entrypoints.websecure.http.encodedCharacters.allowEncodedPercent=true"
+      - "--entrypoints.websecure.http.encodedCharacters.allowEncodedQuestionMark=true"
+      - "--entrypoints.websecure.http.encodedCharacters.allowEncodedHash=true"
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      - "--log.level=DEBUG"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /opt/core/traefik/dynamic:/etc/traefik/dynamic
+      - /etc/pki/homelab/certs/root-ca.crt:/etc/traefik/certs/lab_root_ca.crt:ro
+{% for service in pki_services %}
+      - /etc/pki/homelab/certs/{{ service.name }}.crt:/etc/traefik/certs/{{ service.name }}.crt:ro
+      - /etc/pki/homelab/private/{{ service.name }}.key:/etc/traefik/certs/{{ service.name }}.key:ro
+{% endfor %}
+    extra_hosts:
+{% for host in bastion_internal_hosts_dns %}
+      - "{{ host.dns }}:{{ host.ip }}"
+{% endfor %}
+
+  dns:
+    image: adguard/adguardhome:{{ adguard_version }}
+    container_name: dns
+    restart: unless-stopped
+    networks:
+      - core_net
+    # Changed Ports 443 and 80 to not conflitc with Traefik, and added 853 for DNS over TLS
+    ports:
+      - "53:53/udp"
+      - "53:53/tcp"
+      - "853:853/tcp"
+      - "853:853/udp"
+      - "3000:3000/tcp" # Administractive port for Traefik proxy
+    volumes:
+      - /opt/core/adguard/work:/opt/adguardhome/work
+      - /opt/core/adguard/conf:/opt/adguardhome/conf
+
+  dns-sidecar:
+    image: ghostunnel/ghostunnel:{{ ghostunnel_version }}
+    container_name: dns-sidecar
+    restart: unless-stopped
+    network_mode: service:dns
+    command:
+      - "server"
+      - "--listen=0.0.0.0:8443"
+      - "--target=127.0.0.1:3000"
+      - "--cert=/certs/adguard.crt"
+      - "--key=/certs/adguard.key"
+      - "--cacert=/certs/ca.crt"
+      - "--allow-all"
+    
+    volumes:
+      - /etc/pki/homelab/certs/adguard.crt:/certs/adguard.crt:ro
+      - /etc/pki/homelab/private/adguard.key:/certs/adguard.key:ro
+      - /etc/pki/homelab/certs/root-ca.crt:/certs/ca.crt:ro
+    user: "65534:65534"
+    depends_on:
+      - dns
+
+  upsnap:
+    image: ghcr.io/seriousm4x/upsnap:{{ upsnap_version }}
+    container_name: upsnap
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - "./upsnap"
+      - "serve"
+      - "--http={{ upsnap_config.bind_address }}:{{ upsnap_config.web_port }}"
+    
+    volumes:
+      - /opt/core/upsnap:/app/pb_data
+      - /home/vanguard/.ssh:/ssh:ro
+    environment:
+      - UPSNAP_HTTP_BIND={{ upsnap_config.bind_address }}:{{ upsnap_config.web_port }}
+      - UPSNAP_SCAN_RANGE={{ upsnap_config.scan_range }}
+      - UPSNAP_SSH_TIMEOUT={{ upsnap_config.ssh_timeout }}
+      - UPSNAP_WOL_BROADCAST={{ upsnap_config.wol_settings.broadcast_address }}
+      - UPSNAP_WOL_PORT={{ upsnap_config.wol_settings.magic_packet_port }}
+    
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://{{ upsnap_config.bind_address }}:{{ upsnap_config.web_port }}/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  upsnap-sidecar:
+    image: ghostunnel/ghostunnel:{{ ghostunnel_version }}
+    container_name: upsnap-sidecar
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - "server"
+      - "--listen=0.0.0.0:8443"
+      - "--target={{ upsnap_config.bind_address }}:{{ upsnap_config.web_port }}"
+      - "--cert=/certs/upsnap.crt"
+      - "--key=/certs/upsnap.key"
+      - "--cacert=/certs/ca.crt"
+      - "--allow-all"
+    
+    volumes:
+      - /etc/pki/homelab/certs/upsnap.crt:/certs/upsnap.crt:ro
+      - /etc/pki/homelab/private/upsnap.key:/certs/upsnap.key:ro
+      - /etc/pki/homelab/certs/root-ca.crt:/certs/ca.crt:ro
+    user: "65534:65534"
+    depends_on:
+      - upsnap
+    
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "8443"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  core_net:
+    external: true
+  proxy_net:
+    external: true

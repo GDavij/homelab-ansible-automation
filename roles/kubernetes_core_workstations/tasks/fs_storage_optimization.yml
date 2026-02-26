@@ -1,0 +1,29 @@
+---
+- name: Increase INode Limits for Kubernetes (Inotify Watches and Instances)
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    sysctl_set: true
+    state: present
+    reload: true
+  loop:
+    - { name: 'fs.inotify.max_user_watches', value: '524288' }
+    - { name: 'fs.inotify.max_user_instances', value: '512' }
+  become: true
+
+- name: Disable Copy on Write to optimize BTRFS on ETCD for IOPS
+  block:
+    - name: Remove /var/lib/etcd if it exists (Ensures we apply on an empty dir)
+      ansible.builtin.file:
+        path: /var/lib/etcd
+        state: absent
+        mode: '0755'
+      become: true
+
+    - name: Create /var/lib/etcd directory
+      ansible.builtin.file:
+        path: /var/lib/etcd
+        state: directory
+        mode: '0755'
+        attributes: '+C'  # Disable Copy on Write (No_CoW)
+      become: true

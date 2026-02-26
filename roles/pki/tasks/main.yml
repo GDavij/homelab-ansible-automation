@@ -1,3 +1,4 @@
+---
 - name: Ensure that PKI Folder Exists
   ansible.builtin.file:
     path: "{{ pki_output_folder }}"
@@ -36,8 +37,8 @@
     loop_var: service
     label: "{{ service.name }} ({{ service.dns }})"
   tags:
-    pki
-    service-certs
+    - pki
+    - service-certs
 
 - name: Generate Client Certificates for mTLS Authentication
   ansible.builtin.include_tasks:

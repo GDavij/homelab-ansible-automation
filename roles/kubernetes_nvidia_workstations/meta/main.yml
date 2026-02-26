@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: gdavij
+  description: "NVIDIA GPU device plugin configuration for Kubernetes pod scheduling"
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Fedora
+      versions: [all]
+dependencies: []

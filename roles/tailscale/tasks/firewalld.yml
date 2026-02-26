@@ -1,3 +1,4 @@
+---
 - name: Refresh Network Facts (catch tailscale0 interface)
   ansible.builtin.setup:
     gather_subset: network
@@ -12,7 +13,7 @@
     state: present
     permanent: true
   become: true
-  notify: Reload_firewalld
+  notify: Reload Firewalld (Tailscale)
   tags:
     - tailscale
     - firewalld
@@ -53,7 +54,7 @@
     cmd: firewall-cmd --zone=ztn_network --set-target=ACCEPT --permanent
   become: true
   changed_when: true
-  notify: Reload_firewalld
+  notify: Reload Firewalld (Tailscale)
   tags:
     - tailscale
     - firewalld

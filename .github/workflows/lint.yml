@@ -1,0 +1,36 @@
+---
+name: Ansible Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Ansible Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ansible
+        run: pip install ansible-core
+
+      - name: Install Ansible Galaxy dependencies
+        run: ansible-galaxy install -r requirements.yml
+
+      - name: Create dummy vault password file
+        run: echo "ci-dummy-vault-pass" > ~/.ansible_vault_pass
+
+      - name: Create dummy inventory
+        run: cp inventory.example.ini inventory.ini
+
+      - name: Run ansible-lint
+        uses: ansible/ansible-lint@v24

@@ -1,0 +1,8 @@
+---
+- name: Apply Init RBAC Policies
+  ansible.builtin.include_tasks:
+    file: rbac_policies.yml
+
+- name: Sync User Remote Access Config
+  ansible.builtin.include_tasks:
+    file: remote_sync_user_access.yml

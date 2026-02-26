@@ -1,3 +1,4 @@
+---
 - name: Setup Culture
   ansible.builtin.include_tasks:
     file: setup_culture.yml

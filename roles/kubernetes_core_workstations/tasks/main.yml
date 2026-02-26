@@ -1,0 +1,49 @@
+---
+- name: Install Heml Package
+  ansible.builtin.package:
+    name: helm
+
+- name: Reset Kubernetes Cluster
+  ansible.builtin.include_tasks:
+    file: reset.yml
+  when: k8s_force_reset | default(false) | bool
+
+- name: Harden Security
+  ansible.builtin.include_tasks:
+    file: os_security.yml
+
+- name: Load Additional Kernel Modules
+  ansible.builtin.include_tasks:
+    file: os_kernel.yml
+
+- name: Optimize Memory Management
+  ansible.builtin.include_tasks:
+    file: memory_optimization.yml
+
+- name: Optmize File System Storage
+  ansible.builtin.include_tasks:
+    file: fs_storage_optimization.yml
+
+- name: Upload Certificates for Cluster Access
+  ansible.builtin.include_tasks:
+    file: certificates.yml
+
+- name: Configure NLB Pointer for Multi Node Single Master Arch
+  ansible.builtin.include_tasks:
+    file: nlb_network.yml
+
+- name: Install Container Runtime (Containerd)
+  ansible.builtin.include_tasks:
+    file: container_runtime.yml
+
+- name: Install Kubernetes Cluster
+  ansible.builtin.include_tasks:
+    file: kubernetes.yml
+
+- name: Install Kubernetes CNI (Cilium)
+  ansible.builtin.include_tasks:
+    file: kubernetes_cni.yml
+
+- name: Apply Certificates Secrets to Cluster
+  ansible.builtin.include_tasks:
+    file: apply_certificates.yml

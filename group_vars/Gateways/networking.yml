@@ -1,1 +1,2 @@
-subnet_cidr: 192.168.1.0/24
+---
+# subnet_cidr is defined in group_vars/all.yml (shared across all groups)

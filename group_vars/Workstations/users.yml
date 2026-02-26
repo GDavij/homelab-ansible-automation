@@ -1,3 +1,4 @@
+---
 # System Groups and Users Configuration
 system_groups:
   - sudo
@@ -13,7 +14,7 @@ system_users:
     groups: sudo,docker,ssl-cert
     shell: /bin/bash
     state: present
-  - username: upsnap # Up Snap Specific User that can just poweroff or reboot the computer nothing more.
+  - username: upsnap  # Up Snap Specific User that can just poweroff or reboot the computer nothing more.
     groups: ""  # No groups - restricted user
     shell: /bin/bash
     state: present

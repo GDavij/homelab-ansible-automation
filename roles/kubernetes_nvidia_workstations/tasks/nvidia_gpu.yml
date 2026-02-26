@@ -1,0 +1,55 @@
+---
+- name: Ensure manifest directory exists
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user }}/k8s"
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: Configure containerd runtime for NVIDIA
+  ansible.builtin.command:
+    cmd: nvidia-ctk runtime configure --runtime=containerd
+  become: true
+  changed_when: true
+  notify: Restart Containerd (Kubernetes Nvidia)
+
+- name: Label Monster node with GPU presence
+  become: true
+  kubernetes.core.k8s:
+    state: patched
+    kind: Node
+    name: "{{ node_name | lower }}-workstation"
+    kubeconfig: /etc/kubernetes/admin.conf
+    definition:
+      metadata:
+        labels:
+          nvidia.com/gpu.present: "true"
+
+- name: Copy Manifests for Nvidia GPU Support
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/home/{{ ansible_user }}/k8s/{{ item }}"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  with_items:
+    - nvidia_runtime.k8s.yml
+    - nvidia_device_plugin.k8s.yml
+  become: true
+
+- name: Apply Nvidia GPU Configuration (Runtime & ConfigMap)
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    src: "/home/{{ ansible_user }}/k8s/nvidia_runtime.k8s.yml"
+    kubeconfig: /etc/kubernetes/admin.conf
+
+- name: Define Nvidia GPU Device Plugin DaemonSet
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    src: "/home/{{ ansible_user }}/k8s/nvidia_device_plugin.k8s.yml"
+    kubeconfig: /etc/kubernetes/admin.conf
+
+- name: Flush Handlers
+  ansible.builtin.meta: flush_handlers

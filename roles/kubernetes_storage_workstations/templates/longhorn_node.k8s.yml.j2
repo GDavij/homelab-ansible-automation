@@ -1,0 +1,21 @@
+apiVersion: longhorn.io/v1beta2
+kind: Node
+metadata:
+  name: {{ node_hostname }}
+  namespace: longhorn-system
+spec:
+  allowScheduling: true
+  disks:
+    ssd_01:
+      path: /var/lib/longhorn
+      allowScheduling: true
+      storageReserved: 20480000000 # 20GB
+      tags:
+        - ssd
+    
+    hdd_01:
+      path: /cold-storage/longhorn
+      allowScheduling: true
+      storageReserved: 53687091200 # 50GB
+      tags:
+        - hdd

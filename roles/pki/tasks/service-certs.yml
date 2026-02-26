@@ -1,3 +1,4 @@
+---
 - name: Verify if Certificate already exists for {{ service.name }}
   ansible.builtin.stat:
     path: "{{ pki_output_folder }}/{{ service.name }}.crt"
@@ -62,7 +63,13 @@
         locality_name: "{{ pki_ca_locality }}"
 
         # Subject Alt Name(SANs) - Include both DNS and IP for GhostTunnel compatibility
-        subject_alt_name: "DNS:{{ service.dns }},IP:{{ service.ip }}"
+        subject_alt_name: >-
+          DNS:{{ service.dns }},IP:{{ service.ip }}
+          {%- if service.dns_alt is defined -%}
+            {%- for alt in service.dns_alt -%}
+              ,DNS:{{ alt }}
+            {%- endfor -%}
+          {%- endif -%}
 
         # Critical extensions for browser trust
         key_usage:

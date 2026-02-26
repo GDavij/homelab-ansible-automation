@@ -1,3 +1,4 @@
+---
 - name: Check if Tailscale already Installed
   ansible.builtin.stat:
     path: /usr/bin/tailscale

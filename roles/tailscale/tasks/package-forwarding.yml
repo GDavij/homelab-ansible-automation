@@ -1,4 +1,5 @@
-- name: Enable Ipv4 Fowarding
+---
+- name: Enable Ipv4 Forwarding
   ansible.posix.sysctl:
     name: net.ipv4.ip_forward
     value: '1'
@@ -9,7 +10,7 @@
   tags:
     - tailscale
 
-- name: Enable Ipv6 Fowarding
+- name: Enable Ipv6 Forwarding
   ansible.posix.sysctl:
     name: net.ipv6.conf.all.forwarding
     value: '1'

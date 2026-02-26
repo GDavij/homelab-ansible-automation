@@ -1,0 +1,77 @@
+---
+- name: Workstation Configuration Playbook
+  hosts: Workstations
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Common System Setup
+      ansible.builtin.import_role:
+        name: common
+      tags:
+        - common
+        - base
+
+    - name: Install NVIDIA GPU Drivers
+      ansible.builtin.import_role:
+        name: nvidia_gpu
+      tags:
+        - nvidia_gpu
+        - graphics
+
+    - name: Network Workstation Configuration
+      ansible.builtin.import_role:
+        name: network_workstations
+      tags:
+        - network
+        - firewall
+
+    - name: Kubernetes Cluster Workstation Setup
+      ansible.builtin.import_role:
+        name: kubernetes_core_workstations
+      tags:
+        - kubernetes
+        - k8s
+
+    - name: Kubernetes Security Workstation Setup
+      ansible.builtin.import_role:
+        name: kubernetes_security_workstations
+      tags:
+        - kubernetes
+        - security
+        - k8s
+
+    - name: Kubernetes NVIDIA GPU Support Setup
+      ansible.builtin.import_role:
+        name: kubernetes_nvidia_workstations
+      tags:
+        - kubernetes
+        - nvidia_gpu
+        - k8s
+
+    - name: Kubernetes Storage Workstation Setup
+      ansible.builtin.import_role:
+        name: kubernetes_storage_workstations
+      tags:
+        - kubernetes
+        - storage
+        - k8s
+
+    - name: Kubernetes Autoscaling and Metrics Workstation Setup
+      ansible.builtin.import_role:
+        name: kubernetes_scaling_workstations
+      tags:
+        - kubernetes
+        - autoscaling
+        - monitoring
+        - k8s
+
+    - name: Kubernetes CNI and Ingress Workstation Setup
+      ansible.builtin.import_role:
+        name: kubernetes_cni_workstations
+      tags:
+        - kubernetes
+        - cni
+        - ingress
+        - k8s
+        - traefik
+        - argocd

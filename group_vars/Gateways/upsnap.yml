@@ -1,3 +1,4 @@
+---
 # Upsnap Configuration for Wake-on-LAN Service
 # Devices are managed through the Upsnap web interface
 
@@ -9,14 +10,14 @@ upsnap_config:
   data_dir: "/app/data"  # PocketBase data directory
 
   # Network scanning configuration
-  scan_range: "192.168.1.0/24"  # Network range to scan
+  scan_range: "{{ network_subnet_cidr }}"  # Network range to scan
 
   # SSH configuration for remote power management
   ssh_timeout: 30  # SSH connection timeout in seconds
 
   # Wake-on-LAN settings
   wol_settings:
-    broadcast_address: "192.168.1.255"  # Network broadcast address for WoL packets
+    broadcast_address: "{{ network_broadcast_ip }}"  # Network broadcast address for WoL packets
     magic_packet_port: 9  # Standard WoL magic packet port (UDP port 9)
 
   # Auto-discovery settings
@@ -24,5 +25,5 @@ upsnap_config:
     enabled: true  # Enable automatic device discovery
     initial_scan: true  # Perform initial network scan on startup
     exclude_ips:  # IP addresses to exclude from scanning
-      - "192.168.1.1"   # Gateway
-      - "192.168.1.77"  # Bastion (self)
+      - "{{ router_ip }}"   # Router
+      - "{{ gateway_core_station_ip }}"  # Bastion (self)

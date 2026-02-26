@@ -1,4 +1,5 @@
-- name: Reload_firewalld
+---
+- name: Reload Firewalld (Network Gateways)
   ansible.builtin.service:
     name: firewalld
     state: reloaded

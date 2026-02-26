@@ -1,3 +1,4 @@
+---
 - name: Allow SSH for Inbound Traffic on Underlay Network
   ansible.posix.firewalld:
     zone: underlay_network
@@ -18,7 +19,7 @@
     immediate: true
   become: true
   tags:
-    - network_gateways
+    - network_gateways`
 
 - name: Allow HTTP Inbound Traffic on Underlay Network
   ansible.posix.firewalld:

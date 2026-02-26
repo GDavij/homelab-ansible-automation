@@ -1,0 +1,12 @@
+---
+- name: Workstation Configuration Playbook
+  hosts: Gateways
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Generate Certificates for Services
+      ansible.builtin.include_role:
+        name: pki
+      tags:
+        - pki
+        - certificates

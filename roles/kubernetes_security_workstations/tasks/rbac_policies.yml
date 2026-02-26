@@ -1,0 +1,19 @@
+---
+- name: "Setup Initial RBAC Governance Policies"
+  become: true
+  block:
+    - name: "Generate RBAC Configuration Manifest from J2 Template"
+      ansible.builtin.template:
+        src: rbac_init.k8s.yml.j2
+        dest: /tmp/k8s-rbac-config.yml
+        mode: '0644'
+
+    - name: "Apply RBAC Manifest with Retry to survive any eventual I/O Storm"
+      kubernetes.core.k8s:
+        state: present
+        src: /tmp/k8s-rbac-config.yml
+        kubeconfig: /etc/kubernetes/admin.conf
+      register: kubernetes_security_workstations_rbac_apply_res
+      until: kubernetes_security_workstations_rbac_apply_res is not failed
+      retries: 10
+      delay: 10
