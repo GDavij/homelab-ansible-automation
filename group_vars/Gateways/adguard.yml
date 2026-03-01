@@ -56,6 +56,26 @@ adguard_rewrites:
     description: Trilium Host, Personal Knowledge Base
     ip: "{{ gateway_core_station_ip }}"
 
+  - name: victoriametrics
+    dns: "metrics.lab"
+    description: VictoriaMetrics Metrics Database
+    ip: "{{ gateway_core_station_ip }}"
+
+  - name: grafana
+    dns: "dash.lab"
+    description: Grafana Dashboards
+    ip: "{{ gateway_core_station_ip }}"
+
+  - name: jaeger
+    dns: "traces.lab"
+    description: Jaeger Tracing Backend
+    ip: "{{ gateway_core_station_ip }}"
+
+  - name: jaeger-ingestion
+    dns: "ingestion.traces.lab"
+    description: Jaeger OTLP Ingestion Endpoint
+    ip: "{{ gateway_core_station_ip }}"
+
   - name: K8s NLB Proxy
     dns: nlb.k8s.monster.lab
     description: Split-Horizon DNS - Kubernetes API Server via NLB

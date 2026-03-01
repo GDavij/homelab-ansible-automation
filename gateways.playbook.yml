@@ -4,19 +4,19 @@
   become: true
   gather_facts: true
   tasks:
-    - name: Common System Setup
-      ansible.builtin.import_role:
-        name: common
-      tags:
-        - common
-        - base
-
     - name: Network Gateway Configuration
       ansible.builtin.import_role:
         name: network_gateways
       tags:
         - network
         - firewall
+
+    - name: Common System Setup
+      ansible.builtin.import_role:
+        name: common
+      tags:
+        - common
+        - base
 
     - name: Setup Tailscale ZTN Tunnel (Optional)
       ansible.builtin.include_role:

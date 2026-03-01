@@ -4,6 +4,7 @@
     zone: underlay_network
     state: present
     permanent: true
+    target: DROP
   become: true
   notify:
     - Reload Firewalld (Network Workstations)

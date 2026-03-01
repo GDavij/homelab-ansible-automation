@@ -70,6 +70,54 @@ http_routers:
     tls:
       passthrough: false
 
+  - name: victoriametrics
+    rule: "Host(`metrics.lab`)"
+    entryPoints:
+      - websecure
+    mtls: false
+    service:
+      loadBalancer:
+        servers:
+          - url: "https://victoriametrics:8443"
+    tls:
+      passthrough: false
+
+  - name: grafana
+    rule: "Host(`dash.lab`)"
+    entryPoints:
+      - websecure
+    mtls: true
+    service:
+      loadBalancer:
+        servers:
+          - url: "https://grafana:8443"
+    tls:
+      passthrough: false
+
+  - name: jaeger
+    rule: "Host(`traces.lab`)"
+    entryPoints:
+      - websecure
+    mtls: true
+    service:
+      loadBalancer:
+        servers:
+          - url: "https://jaeger:8443"
+    tls:
+      passthrough: false
+
+  - name: jaeger-ingestion
+    rule: "Host(`ingestion.traces.lab`)"
+    entryPoints:
+      - websecure
+    mtls: false
+    service:
+      loadBalancer:
+        servers:
+          - url: "https://jaeger:9443"
+    tls:
+      passthrough: false
+
 tcp_routers:
   - name: K8s-cluster-api-server
     rule: "HostSNI(`nlb.k8s.monster.lab`)"

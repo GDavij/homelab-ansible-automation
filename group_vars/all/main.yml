@@ -49,6 +49,26 @@ pki_services:
     description: Trilium Host, Personal Knowledge Base
     ip: "{{ gateway_core_station_ip }}"
 
+  - name: victoriametrics
+    dns: "metrics.lab"
+    description: VictoriaMetrics Time-Series Database
+    ip: "{{ gateway_core_station_ip }}"
+
+  - name: grafana
+    dns: "dash.lab"
+    description: Grafana Dashboards
+    ip: "{{ gateway_core_station_ip }}"
+
+  - name: jaeger
+    dns: "traces.lab"
+    description: Jaeger Distributed Tracing
+    ip: "{{ gateway_core_station_ip }}"
+
+  - name: jaeger-ingestion
+    dns: "ingestion.traces.lab"
+    description: Jaeger OTLP Ingestion Endpoint
+    ip: "{{ gateway_core_station_ip }}"
+
   - name: kubernetes-ingress-traefik
     dns: "*.svc.k8s.monster.lab"
     description: Kubernetes Ingress Controller (Traefik)

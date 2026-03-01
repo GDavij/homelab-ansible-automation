@@ -1,0 +1,27 @@
+---
+- name: Setup Internal Host DNS on /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    line: "{{ item.ip }} {{ item.dns }}  # {{ item.description }}"
+    state: present
+    create: true
+    mode: '0644'
+  become: true
+  loop: "{{ bastion_internal_hosts_dns }}"
+
+- name: Ensure router DNS is available via dhcpcd resolv.conf.head
+  ansible.builtin.copy:
+    content: "nameserver {{ router_ip }}\n"
+    dest: /etc/resolv.conf.head
+    owner: root
+    group: root
+    mode: '0644'
+  become: true
+  register: dns_head_result
+
+- name: Apply DNS change immediately
+  ansible.builtin.command:
+    cmd: dhcpcd --rebind enp4s0
+  become: true
+  changed_when: true
+  when: dns_head_result.changed

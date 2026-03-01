@@ -137,6 +137,125 @@ services:
       retries: 3
       start_period: 10s
 
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:{{ victoriametrics_version }}
+    container_name: victoriametrics
+    restart: unless-stopped
+    command:
+      - "-retentionPeriod=12"
+      - "-storageDataPath=/victoria-metrics-data"
+    networks:
+      - core_net
+    volumes:
+      - /opt/core/victoriametrics:/victoria-metrics-data
+
+  victoriametrics-sidecar:
+    image: ghostunnel/ghostunnel:{{ ghostunnel_version }}
+    container_name: victoriametrics-sidecar
+    restart: unless-stopped
+    network_mode: service:victoriametrics
+    command:
+      - "server"
+      - "--listen=0.0.0.0:8443"
+      - "--target=127.0.0.1:8428"
+      - "--cert=/certs/victoriametrics.crt"
+      - "--key=/certs/victoriametrics.key"
+      - "--cacert=/certs/ca.crt"
+      - "--allow-all"
+    volumes:
+      - /etc/pki/homelab/certs/victoriametrics.crt:/certs/victoriametrics.crt:ro
+      - /etc/pki/homelab/private/victoriametrics.key:/certs/victoriametrics.key:ro
+      - /etc/pki/homelab/certs/root-ca.crt:/certs/ca.crt:ro
+    user: "65534:65534"
+    depends_on:
+      - victoriametrics
+
+  grafana:
+    image: grafana/grafana:{{ grafana_version }}
+    container_name: grafana
+    restart: unless-stopped
+    networks:
+      - core_net
+    volumes:
+      - /opt/core/grafana:/var/lib/grafana
+      - /opt/core/grafana/provisioning/datasources/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+
+  grafana-sidecar:
+    image: ghostunnel/ghostunnel:{{ ghostunnel_version }}
+    container_name: grafana-sidecar
+    restart: unless-stopped
+    network_mode: service:grafana
+    command:
+      - "server"
+      - "--listen=0.0.0.0:8443"
+      - "--target=127.0.0.1:3000"
+      - "--cert=/certs/grafana.crt"
+      - "--key=/certs/grafana.key"
+      - "--cacert=/certs/ca.crt"
+      - "--allow-all"
+    volumes:
+      - /etc/pki/homelab/certs/grafana.crt:/certs/grafana.crt:ro
+      - /etc/pki/homelab/private/grafana.key:/certs/grafana.key:ro
+      - /etc/pki/homelab/certs/root-ca.crt:/certs/ca.crt:ro
+    user: "65534:65534"
+    depends_on:
+      - grafana
+
+  jaeger:
+    image: jaegertracing/jaeger:{{ jaeger_version }}
+    container_name: jaeger
+    restart: unless-stopped
+    networks:
+      - core_net
+    volumes:
+      - /opt/core/jaeger:/data
+    environment:
+      - BADGER_DIRECTORY_VALUE=/data
+      - BADGER_DIRECTORY_KEY=/data
+      - BADGER_SPAN_STORE_TTL=8760h
+
+  jaeger-sidecar:
+    image: ghostunnel/ghostunnel:{{ ghostunnel_version }}
+    container_name: jaeger-sidecar
+    restart: unless-stopped
+    network_mode: service:jaeger
+    command:
+      - "server"
+      - "--listen=0.0.0.0:8443"
+      - "--target=127.0.0.1:16686"
+      - "--cert=/certs/jaeger.crt"
+      - "--key=/certs/jaeger.key"
+      - "--cacert=/certs/ca.crt"
+      - "--allow-all"
+    volumes:
+      - /etc/pki/homelab/certs/jaeger.crt:/certs/jaeger.crt:ro
+      - /etc/pki/homelab/private/jaeger.key:/certs/jaeger.key:ro
+      - /etc/pki/homelab/certs/root-ca.crt:/certs/ca.crt:ro
+    user: "65534:65534"
+    depends_on:
+      - jaeger
+
+  jaeger-ingestion-sidecar:
+    image: ghostunnel/ghostunnel:{{ ghostunnel_version }}
+    container_name: jaeger-ingestion-sidecar
+    restart: unless-stopped
+    network_mode: service:jaeger
+    command:
+      - "server"
+      - "--listen=0.0.0.0:9443"
+      - "--target=127.0.0.1:4318"
+      - "--cert=/certs/jaeger-ingestion.crt"
+      - "--key=/certs/jaeger-ingestion.key"
+      - "--cacert=/certs/ca.crt"
+      - "--allow-all"
+    volumes:
+      - /etc/pki/homelab/certs/jaeger-ingestion.crt:/certs/jaeger-ingestion.crt:ro
+      - /etc/pki/homelab/private/jaeger-ingestion.key:/certs/jaeger-ingestion.key:ro
+      - /etc/pki/homelab/certs/root-ca.crt:/certs/ca.crt:ro
+    user: "65534:65534"
+    depends_on:
+      - jaeger
+
 networks:
   core_net:
     external: true

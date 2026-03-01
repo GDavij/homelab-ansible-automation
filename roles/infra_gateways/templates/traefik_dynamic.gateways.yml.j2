@@ -13,7 +13,12 @@ http:
 {% else %}
       service: {{ router.name }}-service
 {% endif %}
+{% if router.mtls is defined and not router.mtls %}
+      tls:
+        options: no-client-cert
+{% else %}
       tls: {}
+{% endif %}
 {% endfor %}
 
   services:
@@ -21,9 +26,7 @@ http:
 {% if router.internal is not defined %}
     {{ router.name }}-service:
       loadBalancer:
-{% if router.mtls %}
         serversTransport: {{ router.name }}-transport
-{% endif %}
         servers:
 {% for server in router.service.loadBalancer.servers %}
           - url: "{{ server.url }}"
@@ -110,6 +113,12 @@ tls:
         clientAuthType: RequireAndVerifyClientCert
       sniStrict: true
     k8s-api-server:
+      clientAuth:
+        clientAuthType: NoClientCert
+      sniStrict: true
+    no-client-cert:
+      minVersion: VersionTLS12
+      maxVersion: VersionTLS13
       clientAuth:
         clientAuthType: NoClientCert
       sniStrict: true

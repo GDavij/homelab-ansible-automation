@@ -1,8 +1,4 @@
 ---
-- name: Setup Internal Host DNS on /etc/hosts
-  ansible.builtin.include_tasks:
-    file: setup-internal-host-dns.yml
-
 - name: Create Docker core_net for Core Infrastructure Services
   community.docker.docker_network:
     name: core_net
@@ -43,7 +39,24 @@
     - /opt/core/traefik/dynamic
     - /opt/core/upsnap
     - /opt/core/upsnap/ssh_keys
+    - /opt/core/victoriametrics
+    - /opt/core/grafana
+    - /opt/core/grafana/provisioning/datasources
+    - /opt/core/jaeger
     - /composes
+  tags:
+    - infra_gateways
+
+- name: Set Grafana directory ownership (UID 472)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: '472'
+    group: '472'
+    recurse: true
+  become: true
+  loop:
+    - /opt/core/grafana
   tags:
     - infra_gateways
 
@@ -51,6 +64,15 @@
   ansible.builtin.template:
     src: traefik_dynamic.gateways.yml.j2
     dest: /opt/core/traefik/dynamic/traefik-dynamic.yml
+    mode: '0644'
+  become: true
+  tags:
+    - infra_gateways
+
+- name: Build Grafana Datasources Provisioning Config
+  ansible.builtin.template:
+    src: grafana_datasources.yml.j2
+    dest: /opt/core/grafana/provisioning/datasources/datasources.yml
     mode: '0644'
   become: true
   tags:
