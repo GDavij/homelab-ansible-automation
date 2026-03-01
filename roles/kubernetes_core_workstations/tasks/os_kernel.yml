@@ -4,15 +4,12 @@
     name: "{{ item }}"
     state: present
   loop:
-    # Netorking Access (CNI)
     - overlay
     - br_netfilter
-    # IPVS (High-Performance Load Balancing)
     - ip_vs
     - ip_vs_rr
     - ip_vs_wrr
     - ip_vs_sh
-    # Connection Tracking (Vital for Kube-Proxy)
     - nf_conntrack
   become: true
 

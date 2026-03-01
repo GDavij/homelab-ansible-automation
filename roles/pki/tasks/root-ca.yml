@@ -29,8 +29,6 @@
         path: "{{ pki_output_folder }}/authorities/root-ca.csr"
         privatekey_path: "{{ pki_output_folder }}/authorities/root-ca.key"
         backup: true
-
-        # Certificate Metadata
         common_name: "{{ pki_ca_common_name }}"
         organization_name: "{{ pki_ca_organization }}"
         organizational_unit_name: "{{ pki_ca_organizational_unit }}"
@@ -38,8 +36,6 @@
         state_or_province_name: "{{ pki_ca_state }}"
         locality_name: "{{ pki_ca_locality }}"
         email_address: "{{ pki_ca_email }}"
-
-        # Constraints for Root CA
         basic_constraints:
           - "CA:TRUE"
         basic_constraints_critical: true
@@ -61,12 +57,8 @@
         csr_path: "{{ pki_output_folder }}/authorities/root-ca.csr"
         provider: selfsigned
         backup: true
-
-        # Root CA Expiration
         selfsigned_not_after: "+3650d"
         selfsigned_not_before: "-1d"
-
-        # Selfsigned options
         selfsigned_digest: sha512
       run_once: true
       delegate_to: localhost

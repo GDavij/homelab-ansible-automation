@@ -1,0 +1,83 @@
+---
+# Generates a temporary Vault admin token for day-to-day operations
+# The token has read/write access to secret/* and expires in 12h
+#
+# Usage:
+#   ansible-playbook vault_admin_token.playbook.yml
+#
+# The token is printed to stdout — copy it and use in the Vault UI or CLI
+
+- name: Generate Temporary Vault Admin Token
+  hosts: Workstations
+  become: true
+  gather_facts: false
+  tasks:
+    - name: "Get Vault Pod"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: security
+        label_selectors:
+          - app=vault
+        kubeconfig: /etc/kubernetes/admin.conf
+      register: vault_admin_pod_info
+
+    - name: "Set Vault Pod Name"
+      ansible.builtin.set_fact:
+        vault_pod: "{{ vault_admin_pod_info.resources[0].metadata.name }}"
+
+    - name: "Check Vault is Unsealed"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ vault_pod }}"
+        command: vault status -format=json
+        kubeconfig: /etc/kubernetes/admin.conf
+      register: vault_admin_status
+      failed_when: >
+        vault_admin_status.rc != 0 or
+        (vault_admin_status.stdout | from_json).sealed
+
+    - name: "Login with Root Token"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ vault_pod }}"
+        command: "vault login {{ vault_root_token }}"
+        kubeconfig: /etc/kubernetes/admin.conf
+      no_log: true
+
+    - name: "Ensure Admin Policy Exists"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ vault_pod }}"
+        command: >-
+          sh -c 'echo "path \"secret/*\" { capabilities = [\"create\", \"read\", \"update\", \"delete\", \"list\"] }
+          path \"sys/mounts\" { capabilities = [\"read\", \"list\"] }
+          path \"sys/mounts/*\" { capabilities = [\"read\"] }" | vault policy write admin-rw -'
+        kubeconfig: /etc/kubernetes/admin.conf
+
+    - name: "Generate Temporary Admin Token (12h TTL)"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ vault_pod }}"
+        command: vault token create -policy=admin-rw -ttl=12h -format=json
+        kubeconfig: /etc/kubernetes/admin.conf
+      register: vault_admin_token_result
+
+    - name: "Parse Token"
+      ansible.builtin.set_fact:
+        vault_temp_token: "{{ (vault_admin_token_result.stdout | from_json).auth.client_token }}"
+        vault_temp_ttl: "{{ (vault_admin_token_result.stdout | from_json).auth.lease_duration }}"
+
+    - name: "Temporary Admin Token"
+      ansible.builtin.debug:
+        msg: |
+          🔑 Vault Temporary Admin Token
+          ─────────────────────────────────
+          Token:   {{ vault_temp_token }}
+          TTL:     {{ vault_temp_ttl }}s (12 hours)
+          Policy:  admin-rw (read/write on secret/*)
+
+          Use in Vault UI: https://vault.svc.k8s.monster.lab
+          Or CLI: export VAULT_TOKEN={{ vault_temp_token }}
+
+          ⚠️  This token expires automatically. Do NOT save it.

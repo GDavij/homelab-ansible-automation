@@ -1,5 +1,5 @@
 ---
-- name: Install Heml Package
+- name: Install Helm Package
   ansible.builtin.package:
     name: helm
 
@@ -20,7 +20,7 @@
   ansible.builtin.include_tasks:
     file: memory_optimization.yml
 
-- name: Optmize File System Storage
+- name: Optimize File System Storage
   ansible.builtin.include_tasks:
     file: fs_storage_optimization.yml
 

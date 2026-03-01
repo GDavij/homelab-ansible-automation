@@ -15,12 +15,3 @@
 - name: Setup Network Services Permissions for Firewalld
   ansible.builtin.include_tasks:
     file: network-setup-services.yml
-
-# - name: Map Internal Identity on /etc/hosts for Kubernetes Access using Internal Nodename
-#   ansible.builtin.lineinfile:
-#     path: /etc/hosts
-#     line: "{{ ansible_host }} {{ inventory_hostname }} {{ node_name | lower }}-workstation"
-#     state: present
-#     mode: '0644'
-#     create: true
-#   become: true

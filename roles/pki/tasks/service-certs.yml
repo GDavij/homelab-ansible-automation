@@ -53,16 +53,12 @@
       community.crypto.openssl_csr:
         path: "{{ pki_output_folder }}/{{ service.name }}.csr"
         privatekey_path: "{{ pki_output_folder }}/{{ service.name }}.key"
-
-        # Certificate Metadata
         common_name: "{{ service.dns }}"
         organization_name: "{{ pki_ca_organization }}"
         organizational_unit_name: "{{ pki_ca_organizational_unit }}"
         country_name: "{{ pki_ca_country }}"
         state_or_province_name: "{{ pki_ca_state }}"
         locality_name: "{{ pki_ca_locality }}"
-
-        # Subject Alt Name(SANs) - Include both DNS and IP for GhostTunnel compatibility
         subject_alt_name: >-
           DNS:{{ service.dns }},IP:{{ service.ip }}
           {%- if service.dns_alt is defined -%}
@@ -70,8 +66,6 @@
               ,DNS:{{ alt }}
             {%- endfor -%}
           {%- endif -%}
-
-        # Critical extensions for browser trust
         key_usage:
           - digitalSignature
           - keyEncipherment
@@ -84,13 +78,9 @@
       community.crypto.x509_certificate:
         path: "{{ pki_output_folder }}/{{ service.name }}.crt"
         csr_path: "{{ pki_output_folder }}/{{ service.name }}.csr"
-
-        # Using Root CA
         provider: ownca
         ownca_path: "{{ pki_output_folder }}/authorities/root-ca.crt"
         ownca_privatekey_path: "{{ pki_output_folder }}/authorities/root-ca.key"
-
-        # Expiriration within 1 Year for Security
         ownca_not_after: "+365d"
         ownca_not_before: "-1d"
       delegate_to: localhost

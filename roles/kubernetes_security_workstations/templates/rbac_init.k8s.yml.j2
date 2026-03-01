@@ -4,15 +4,12 @@ kind: ClusterRoleBinding
 metadata:
   name: controller-admin-binding
 subjects:
-
-#TODO: Add Client ApiGroups Dinamically
-
 {% for client_device in pki_client_devices %}
 - kind: User
-  name: {{ client_device.common_name }} # O nome EXATO que está no Common Name (CN) do seu certificado
+  name: {{ client_device.common_name }}
   apiGroup: rbac.authorization.k8s.io
 {% endfor %}
 roleRef:
   kind: ClusterRole
-  name: cluster-admin # O cargo de "dono do prédio"
+  name: cluster-admin
   apiGroup: rbac.authorization.k8s.io

@@ -1,7 +1,7 @@
 version = 2
 
 [plugins]
-  # --- MUDANÇA AQUI: grpc.v1.cri em vez de cri.v1.runtime ---
+  # --- NOTE: using grpc.v1.cri instead of cri.v1.runtime ---
   [plugins."io.containerd.grpc.v1.cri"]
     sandbox_image = "registry.k8s.io/pause:3.10"
     
@@ -11,7 +11,7 @@ version = 2
 
       [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
 
-        # --- 1. Runtime Padrão (RUNC) ---
+        # --- 1. Default Runtime (RUNC) ---
         [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
           runtime_type = "io.containerd.runc.v2"
           [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
@@ -19,7 +19,7 @@ version = 2
 
         # --- 2. Runtime NVIDIA (GPU) ---
         [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
-          runtime_type = "io.containerd.runc.v2" # Mantém runc.v2
+          runtime_type = "io.containerd.runc.v2" # Keeps runc.v2
           [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
             BinaryName = "/usr/bin/nvidia-container-runtime"
             SystemdCgroup = true

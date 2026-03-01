@@ -1,6 +1,4 @@
 ---
-# Reflector: Replica automática de Secrets e ConfigMaps entre namespaces
-# Usado para compartilhar certificados TLS e CA trust com todos os namespaces do cluster
 - name: "Add Reflector Helm Repository"
   become: true
   kubernetes.core.helm_repository:

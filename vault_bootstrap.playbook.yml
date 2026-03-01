@@ -1,0 +1,214 @@
+---
+# ONE-TIME Vault Bootstrap Playbook
+# Run ONCE after a fresh Vault deployment to:
+#   1. Initialize Vault (generates root token + unseal key)
+#   2. Unseal Vault
+#   3. Enable KV v2 secrets engine
+#   4. Create ESO read-only policy
+#   5. Generate scoped ESO token
+#   6. Save all credentials to secrets.vault.yml (encrypted)
+#   7. Deploy ESO token to cluster
+#
+# Usage:
+#   ansible-playbook vault_bootstrap.playbook.yml
+#
+# Prerequisites:
+#   - Vault deployed via workstations.playbook.yml
+#   - Vault pod running but NOT initialized
+#
+# After running:
+#   - secrets.vault.yml will contain unseal_key, root_token, eso_token
+#   - Re-encrypt: ansible-vault encrypt group_vars/Workstations/secrets.vault.yml
+#   - Commit the encrypted file safely
+
+- name: Vault Bootstrap (One-Time Initialization)
+  hosts: Workstations
+  become: true
+  gather_facts: false
+  tasks:
+    - name: "Get Vault Pod Name"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: security
+        label_selectors:
+          - app=vault
+        kubeconfig: /etc/kubernetes/admin.conf
+      register: vault_bootstrap_pod_info
+
+    - name: "Set Vault Pod Name"
+      ansible.builtin.set_fact:
+        vault_pod: "{{ vault_bootstrap_pod_info.resources[0].metadata.name }}"
+
+    - name: "Check if Vault is Already Initialized"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ vault_pod }}"
+        command: vault status -format=json
+        kubeconfig: /etc/kubernetes/admin.conf
+      register: vault_bootstrap_status
+      failed_when: false
+
+    - name: "Parse Vault Status"
+      ansible.builtin.set_fact:
+        vault_initialized: "{{ (vault_bootstrap_status.stdout | from_json).initialized | default(false) }}"
+
+    - name: "Fail if Vault is Already Initialized"
+      ansible.builtin.fail:
+        msg: >
+          Vault is already initialized. This playbook is for first-time setup only.
+          If you need to re-initialize, delete the Vault PVC first:
+            kubectl delete pvc vault-data -n security
+            kubectl delete deployment vault -n security
+          Then re-run workstations.playbook.yml followed by this playbook.
+      when: vault_initialized | bool
+
+    # --- Step 1: Initialize Vault ---
+    - name: "Initialize Vault (1 key share, 1 threshold)"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ vault_pod }}"
+        command: vault operator init -key-shares=1 -key-threshold=1 -format=json
+        kubeconfig: /etc/kubernetes/admin.conf
+      register: vault_bootstrap_init
+
+    - name: "Parse Init Output"
+      ansible.builtin.set_fact:
+        vault_new_unseal_key: "{{ (vault_bootstrap_init.stdout | from_json).unseal_keys_b64[0] }}"
+        vault_new_root_token: "{{ (vault_bootstrap_init.stdout | from_json).root_token }}"
+
+    # --- Step 2: Unseal Vault ---
+    - name: "Unseal Vault"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ vault_pod }}"
+        command: "vault operator unseal {{ vault_new_unseal_key }}"
+        kubeconfig: /etc/kubernetes/admin.conf
+      no_log: true
+
+    - name: "Wait for Vault to Become Active"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ vault_pod }}"
+        command: vault status -format=json
+        kubeconfig: /etc/kubernetes/admin.conf
+      register: vault_bootstrap_active
+      until:
+        - vault_bootstrap_active.rc == 0
+        - not (vault_bootstrap_active.stdout | from_json).sealed
+      retries: 10
+      delay: 3
+
+    # --- Step 3: Login and Enable KV v2 ---
+    - name: "Login with Root Token"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ vault_pod }}"
+        command: "vault login {{ vault_new_root_token }}"
+        kubeconfig: /etc/kubernetes/admin.conf
+      no_log: true
+
+    - name: "Enable KV v2 Secrets Engine"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ vault_pod }}"
+        command: vault secrets enable -path=secret kv-v2
+        kubeconfig: /etc/kubernetes/admin.conf
+
+    # --- Step 4: Create ESO Policy ---
+    - name: "Create ESO Reader Policy"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ vault_pod }}"
+        command: >
+          sh -c 'vault policy write eso-reader - <<EOF
+          path "secret/data/*" {
+            capabilities = ["read"]
+          }
+          path "secret/metadata/*" {
+            capabilities = ["read", "list"]
+          }
+          EOF'
+        kubeconfig: /etc/kubernetes/admin.conf
+
+    # --- Step 5: Generate Scoped ESO Token ---
+    - name: "Generate ESO Token (read-only, renewable)"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ vault_pod }}"
+        command: vault token create -policy=eso-reader -period=768h -format=json
+        kubeconfig: /etc/kubernetes/admin.conf
+      register: vault_bootstrap_eso_token
+
+    - name: "Parse ESO Token"
+      ansible.builtin.set_fact:
+        vault_new_eso_token: "{{ (vault_bootstrap_eso_token.stdout | from_json).auth.client_token }}"
+
+    # --- Step 6: Save Credentials to secrets.vault.yml ---
+    - name: "Write Credentials to secrets.vault.yml (plaintext — encrypt after)"
+      ansible.builtin.copy:
+        dest: "{{ playbook_dir }}/group_vars/Workstations/secrets.vault.yml"
+        mode: '0600'
+        content: |
+          ---
+          # Generated by vault_bootstrap.playbook.yml on {{ ansible_date_time.iso8601 | default('unknown') }}
+          # ENCRYPT THIS FILE: ansible-vault encrypt group_vars/Workstations/secrets.vault.yml
+
+          # Vault unseal key (single share — needed on every pod restart)
+          vault_unseal_key: "{{ vault_new_unseal_key }}"
+
+          # Vault root token (admin operations only)
+          vault_root_token: "{{ vault_new_root_token }}"
+
+          # ESO read-only token (policy: eso-reader, period: 768h, renewable)
+          vault_eso_token: "{{ vault_new_eso_token }}"
+      delegate_to: localhost
+      become: false
+      no_log: true
+
+    - name: "Encrypt secrets.vault.yml with Ansible Vault"
+      ansible.builtin.command:
+        cmd: ansible-vault encrypt "{{ playbook_dir }}/group_vars/Workstations/secrets.vault.yml"
+      delegate_to: localhost
+      become: false
+      changed_when: true
+
+    # --- Step 7: Deploy ESO Token to Cluster ---
+    - name: "Ensure External Secrets Namespace Exists"
+      kubernetes.core.k8s:
+        state: present
+        kind: Namespace
+        name: external-secrets
+        kubeconfig: /etc/kubernetes/admin.conf
+
+    - name: "Deploy Vault Token for ESO Authentication"
+      kubernetes.core.k8s:
+        state: present
+        kubeconfig: /etc/kubernetes/admin.conf
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: vault-token
+            namespace: external-secrets
+          type: Opaque
+          stringData:
+            token: "{{ vault_new_eso_token }}"
+      no_log: true
+
+    - name: "Bootstrap Complete"
+      ansible.builtin.debug:
+        msg: |
+          ✅ Vault Bootstrap Complete!
+
+          Credentials saved to: group_vars/Workstations/secrets.vault.yml (encrypted)
+          ESO token deployed to: external-secrets/vault-token
+
+          Vault is initialized, unsealed, and ready.
+          KV v2 enabled at: secret/
+          ESO policy: eso-reader (read-only)
+
+          Next steps:
+            1. Populate secrets: vault kv put secret/database/postgres POSTGRES_PASSWORD=...
+            2. Commit the encrypted secrets.vault.yml
+            3. Push homelab-gitops-k8s-cluster to trigger ArgoCD sync

@@ -1,0 +1,136 @@
+---
+- name: "Create Vault Namespace"
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    kind: Namespace
+    name: security
+    kubeconfig: /etc/kubernetes/admin.conf
+
+- name: "Wait for Longhorn CSI Plugin to be Ready"
+  become: true
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: DaemonSet
+    name: longhorn-csi-plugin
+    namespace: longhorn-system
+    kubeconfig: /etc/kubernetes/admin.conf
+  register: kubernetes_cni_workstations_longhorn_csi
+  until:
+    - kubernetes_cni_workstations_longhorn_csi.resources | length > 0
+    - kubernetes_cni_workstations_longhorn_csi.resources[0].status.numberReady | default(0) > 0
+    - kubernetes_cni_workstations_longhorn_csi.resources[0].status.numberReady == kubernetes_cni_workstations_longhorn_csi.resources[0].status.desiredNumberScheduled
+  retries: 30
+  delay: 10
+
+- name: "Wait for Reflector to Replicate TLS Secret to Security Namespace"
+  become: true
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: "{{ node_name }}-server-cert"
+    namespace: security
+    kubeconfig: /etc/kubernetes/admin.conf
+  register: kubernetes_cni_workstations_vault_secret
+  until: kubernetes_cni_workstations_vault_secret.resources | length > 0
+  retries: 30
+  delay: 5
+
+- name: "Build Vault Manifest"
+  ansible.builtin.template:
+    dest: "/tmp/vault.k8s.yml"
+    src: "vault.k8s.yml.j2"
+    mode: '0644'
+  become: true
+
+- name: "Apply Vault Manifest"
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    src: /tmp/vault.k8s.yml
+    kubeconfig: /etc/kubernetes/admin.conf
+
+- name: "Wait for Vault PVC to be Bound"
+  become: true
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: PersistentVolumeClaim
+    name: vault-data
+    namespace: security
+    kubeconfig: /etc/kubernetes/admin.conf
+  register: kubernetes_cni_workstations_vault_pvc
+  until:
+    - kubernetes_cni_workstations_vault_pvc.resources | length > 0
+    - kubernetes_cni_workstations_vault_pvc.resources[0].status.phase == "Bound"
+  retries: 30
+  delay: 10
+
+- name: "Wait for Vault to be Ready"
+  become: true
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: vault
+    namespace: security
+    kubeconfig: /etc/kubernetes/admin.conf
+    wait: true
+    wait_condition:
+      type: Available
+      status: "True"
+    wait_timeout: 300
+
+- name: "Get Vault Pod Name"
+  become: true
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: security
+    label_selectors:
+      - app=vault
+    kubeconfig: /etc/kubernetes/admin.conf
+  register: kubernetes_cni_workstations_vault_pods
+
+- name: "Check Vault Seal Status"
+  become: true
+  kubernetes.core.k8s_exec:
+    namespace: security
+    pod: "{{ kubernetes_cni_workstations_vault_pods.resources[0].metadata.name }}"
+    command: vault status -format=json
+    kubeconfig: /etc/kubernetes/admin.conf
+  register: kubernetes_cni_workstations_vault_status
+  failed_when: false
+
+- name: "Auto-Unseal Vault (idempotent — skips if already unsealed)"
+  become: true
+  kubernetes.core.k8s_exec:
+    namespace: security
+    pod: "{{ kubernetes_cni_workstations_vault_pods.resources[0].metadata.name }}"
+    command: "vault operator unseal {{ vault_unseal_key }}"
+    kubeconfig: /etc/kubernetes/admin.conf
+  when:
+    - kubernetes_cni_workstations_vault_status.stdout is defined
+    - (kubernetes_cni_workstations_vault_status.stdout | from_json).sealed | default(true)
+  no_log: true
+
+- name: "Ensure External Secrets Namespace Exists"
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    kind: Namespace
+    name: external-secrets
+    kubeconfig: /etc/kubernetes/admin.conf
+
+- name: "Deploy Vault Token for ESO Authentication"
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: /etc/kubernetes/admin.conf
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: vault-token
+        namespace: external-secrets
+      type: Opaque
+      stringData:
+        token: "{{ vault_eso_token }}"

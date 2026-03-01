@@ -3,13 +3,13 @@
 # Centralized here for easy upgrades and reproducibility
 
 # Infrastructure Services
-adguard_version: "latest"
+adguard_version: "v0.107.55"
 ghostunnel_version: "v1.8.4-alpine"
 upsnap_version: "5.2"
 
 # Application Services
-memos_version: "stable"
-postgres_version: "16"
-redis_version: "latest"
+memos_version: "0.24.0"
+postgres_version: "16.6-alpine"
+redis_version: "7.4.2-alpine"
 sure_finance_version: "latest"
-trilium_version: "stable"
+trilium_version: "0.63.7"

@@ -68,10 +68,6 @@ spec:
       name: websecure
       targetPort: 443
       nodePort: 30443
-    - protocol: TCP
-      port: 8080
-      name: admin
-      targetPort: 8080
 
 ---
 apiVersion: apps/v1
@@ -104,7 +100,7 @@ spec:
               add:
                 - NET_BIND_SERVICE
           args:
-            - "--api.insecure=true"
+            - "--api.dashboard=false"
             - "--accesslog=true"
             - "--entrypoints.websecure.address=:443"
             - "--providers.kubernetescrd"
@@ -113,8 +109,6 @@ spec:
             - name: websecure
               containerPort: 443
               hostPort: 443
-            - name: admin
-              containerPort: 8080
           resources:
             requests:
               cpu: 250m
@@ -126,8 +120,6 @@ spec:
               ephemeral-storage: 2Gi
 
 ---
-# TLSStore padrão: garante que o Traefik use o certificado PKI
-# ao invés do self-signed "TRAEFIK DEFAULT CERT"
 apiVersion: traefik.io/v1alpha1
 kind: TLSStore
 metadata:

@@ -13,12 +13,19 @@
 
 - name: Disable Copy on Write to optimize BTRFS on ETCD for IOPS
   block:
+    - name: Check if Kubernetes Cluster is already initialized (etcd guard)
+      ansible.builtin.stat:
+        path: /etc/kubernetes/admin.conf
+      register: kubernetes_core_workstations_etcd_guard
+      become: true
+
     - name: Remove /var/lib/etcd if it exists (Ensures we apply on an empty dir)
       ansible.builtin.file:
         path: /var/lib/etcd
         state: absent
         mode: '0755'
       become: true
+      when: not kubernetes_core_workstations_etcd_guard.stat.exists
 
     - name: Create /var/lib/etcd directory
       ansible.builtin.file:
@@ -27,3 +34,4 @@
         mode: '0755'
         attributes: '+C'  # Disable Copy on Write (No_CoW)
       become: true
+      when: not kubernetes_core_workstations_etcd_guard.stat.exists

@@ -1,5 +1,5 @@
 ---
-- name: Workstation Configuration Playbook
+- name: Gateway Certificate Generation Playbook
   hosts: Gateways
   become: true
   gather_facts: true

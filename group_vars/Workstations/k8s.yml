@@ -13,17 +13,21 @@ kubernetes_version: "1.35"
 
 nlb_cluster_hostname: "nlb.{{ cluster_domain }}"
 
-# Serviços K8s expostos via IngressRoute (Traefik)
-# Cada entrada gera: IngressRoute + ServersTransport
-# O FQDN externo segue o padrão CoreDNS: <service>.<namespace>.svc.<cluster_domain>
+# K8s services exposed via IngressRoute (Traefik)
+# Each entry generates: IngressRoute + ServersTransport
+# External FQDN follows the pattern: <service>.svc.<cluster_domain>
 k8s_ingress_services:
   - name: argocd-server
     namespace: argocd
     port: 443
-    insecure_backend: true  # ArgoCD usa TLS próprio, skip verify no backend
+    insecure_backend: true  # ArgoCD uses its own TLS, skip verify on backend
   - name: hubble-ui
     namespace: kube-system
     port: 80
+    insecure_backend: false
+  - name: vault
+    namespace: security
+    port: 8200
     insecure_backend: false
 
 # ArgoCD GitOps Configuration

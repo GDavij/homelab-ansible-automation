@@ -50,12 +50,11 @@ pki_services:
     ip: "{{ gateway_core_station_ip }}"
 
   - name: kubernetes-ingress-traefik
-    dns: "*.k8s.monster.lab"
-    dns_alt:
-      - "argocd-server.argocd.svc.k8s.monster.lab"
-      - "hubble-ui.kube-system.svc.k8s.monster.lab"
+    dns: "*.svc.k8s.monster.lab"
     description: Kubernetes Ingress Controller (Traefik)
     ip: "{{ workstation_core_station_ip }}"
+    dns_alt:
+      - "*.k8s.monster.lab"
 
 # SSH Key Management
 ssh_keys_dir: "{{ playbook_dir }}/.ssh_keys/{{ inventory_hostname }}"

@@ -1,6 +1,4 @@
 ---
-# Handlers for infra_gateways role
-
 - name: Reload Firewalld (Infra Gateways)
   ansible.builtin.service:
     name: firewalld

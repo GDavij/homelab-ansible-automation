@@ -1,0 +1,14 @@
+---
+# Copy this file to all.vault.yml and fill in real values
+# Then encrypt: ansible-vault encrypt group_vars/all.vault.yml
+#
+# Generate strong passphrases:
+#   openssl rand -hex 64
+#
+# These are used as P12 bundle passphrases by the PKI role
+
+# Passphrase for client mTLS certificate P12 bundles (controller, cellphone, etc.)
+client_certificate_secret: "CHANGEME"
+
+# Passphrase for the Root CA P12 bundle
+root_certificate_secret: "CHANGEME"

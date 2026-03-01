@@ -169,6 +169,8 @@ ansible-playbook workstations.playbook.yml
 | `certificates.playbook.yml` | Gateways | Generate Root CA, service TLS certs, client mTLS certs, deploy to hosts |
 | `gateways.playbook.yml` | Gateways | Full gateway stack: system config, firewall, Tailscale, PKI, Docker, Traefik, AdGuard, apps |
 | `workstations.playbook.yml` | Workstations | Full workstation stack: system config, NVIDIA, firewall, Kubernetes, storage, ingress |
+| `vault_bootstrap.playbook.yml` | Workstations | One-time Vault init: initialize, unseal, enable KV v2, create ESO policy + token |
+| `vault_admin_token.playbook.yml` | Workstations | Generate a temporary 12h read/write Vault token for admin operations |
 | `site.playbook.yml` | _(imports both)_ | Runs `gateways.playbook.yml` then `workstations.playbook.yml` |
 
 ### Combo Run
@@ -469,14 +471,14 @@ Managed centrally in `group_vars/Gateways/versions.yml`:
 
 | Variable | Default | Service |
 |----------|---------|---------|
-| `adguard_version` | `latest` | AdGuard Home |
+| `adguard_version` | `v0.107.55` | AdGuard Home |
 | `ghostunnel_version` | `v1.8.4-alpine` | Ghostunnel mTLS sidecars |
 | `upsnap_version` | `5.2` | Upsnap WoL |
-| `memos_version` | `stable` | Memos |
-| `postgres_version` | `16` | PostgreSQL (Sure Finance) |
-| `redis_version` | `latest` | Redis (Sure Finance) |
-| `sure_finance_version` | `v0.1.0` | Sure Finance |
-| `trilium_version` | `stable` | Trilium Notes |
+| `memos_version` | `0.24.0` | Memos |
+| `postgres_version` | `16.6-alpine` | PostgreSQL (Sure Finance) |
+| `redis_version` | `7.4.2-alpine` | Redis (Sure Finance) |
+| `sure_finance_version` | `latest` | Sure Finance |
+| `trilium_version` | `0.63.7` | Trilium Notes |
 
 ---
 

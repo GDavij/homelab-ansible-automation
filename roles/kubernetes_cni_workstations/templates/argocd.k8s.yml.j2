@@ -1,8 +1,3 @@
-{# IngressRoutes e mTLS para serviços K8s expostos via Traefik.
-   Os Secrets (TLS cert + CA trust) são gerenciados pelo Reflector
-   e replicados automaticamente do kube-system para todos os namespaces. #}
-
-{# --- TLSOption mTLS por namespace (referencia o secret replicado pelo Reflector) --- #}
 {% set seen_namespaces = [] %}
 {% for svc in k8s_ingress_services %}
 {% if svc.namespace not in seen_namespaces %}
@@ -23,7 +18,6 @@ spec:
 {% endif %}
 {% endfor %}
 
-{# --- ServersTransport + IngressRoute por serviço --- #}
 {% for svc in k8s_ingress_services %}
 {% if svc.insecure_backend | default(false) %}
 ---
@@ -47,7 +41,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`{{ svc.name }}.{{ svc.namespace }}.svc.{{ cluster_domain }}`)
+    - match: Host(`{{ svc.name }}.svc.{{ cluster_domain }}`)
       kind: Rule
       services:
         - name: {{ svc.name }}

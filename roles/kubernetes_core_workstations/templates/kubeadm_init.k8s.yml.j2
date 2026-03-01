@@ -1,4 +1,3 @@
-# --- 1. Configuração de Inicialização do Nó (Master) ---
 apiVersion: kubeadm.k8s.io/v1beta4
 kind: InitConfiguration
 nodeRegistration:
@@ -6,18 +5,17 @@ nodeRegistration:
   criSocket: "unix:///run/containerd/containerd.sock"
   imagePullPolicy: "IfNotPresent"
 localAPIEndpoint:
-  advertiseAddress: "{{ ansible_host }}" # Injetado via seu inventário Ansible
+  advertiseAddress: "{{ ansible_host }}"
   bindPort: 6443
 
 ---
-# --- 2. Inteligência do Cluster e Estrutura de Rede ---
 apiVersion: kubeadm.k8s.io/v1beta4
 kind: ClusterConfiguration
 clusterName: "{{ node_name | lower }}-workstation"
 kubernetesVersion: "v{{ kubernetes_version }}.0"
 controlPlaneEndpoint: "{{ nlb_cluster_hostname }}:443"
 certificatesDir: "/etc/kubernetes/pki"
-encryptionAlgorithm: ECDSA-P256 # Criptografia de alta performance para HPC
+encryptionAlgorithm: ECDSA-P256
 
 networking:
   serviceSubnet: "10.96.0.0/12"
@@ -34,7 +32,6 @@ apiServer:
     - "127.0.0.1"
     - "{{ ansible_host }}"
 
-# Garante que os componentes vitais subam (Ignora o desativar da doc genérica)
 dns:
   disabled: false 
 proxy:
@@ -45,16 +42,14 @@ etcd:
     dataDir: "/var/lib/etcd"
 
 ---
-# --- 3. Kubelet: Cgroup v2 e Gestão de Memória (Swap/zRAM) ---
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 clusterDomain: "{{ cluster_domain }}"
 serverTLSBootstrap: true
-cgroupDriver: systemd # Nativo do Fedora 42
-# CONFIGURAÇÃO DE SWAP (HPC Mode):
-failSwapOn: false # Permite que o Kubelet suba com Swap/zRAM ativo
+cgroupDriver: systemd
+failSwapOn: false
 memorySwap:
-  swapBehavior: LimitedSwap # Garante controle sobre o uso de swap pelos pods
+  swapBehavior: LimitedSwap
 authentication:
   anonymous:
     enabled: false
@@ -66,9 +61,8 @@ authorization:
   mode: Webhook
 
 ---
-# --- 4. KubeProxy: O Motor de Rede (MetalLB Ready) ---
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 kind: KubeProxyConfiguration
-mode: "ipvs" # Roteamento via Kernel Hash Tables (Baixíssima latência)
+mode: "ipvs"
 ipvs:
-  strictARP: true # Essencial para o MetalLB anunciar IPs na rede local
+  strictARP: true

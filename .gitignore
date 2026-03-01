@@ -34,3 +34,6 @@ id_ed25519
 .ssh_keys
 .pki_output/
 .pki_output
+
+# --- AI Tool Artifacts ---
+.serena/

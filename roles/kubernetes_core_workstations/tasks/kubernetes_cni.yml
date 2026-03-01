@@ -67,6 +67,7 @@
   failed_when:
     - kubernetes_core_workstations_cilium_install_result.rc != 0
     - "'already installed' not in kubernetes_core_workstations_cilium_install_result.stderr"
+    - "'cannot re-use a name' not in kubernetes_core_workstations_cilium_install_result.stderr"
 
 - name: "Enable Cilium Hubble & UI"
   environment:
@@ -80,6 +81,7 @@
   failed_when:
     - kubernetes_core_workstations_cilium_hubble_result.rc != 0
     - "'already enabled' not in kubernetes_core_workstations_cilium_hubble_result.stderr"
+    - "'cannot re-use a name' not in kubernetes_core_workstations_cilium_hubble_result.stderr"
   notify: Restart Cilium Agents
 
 - name: Flush Handlers to Apply Cilium Changes immediately

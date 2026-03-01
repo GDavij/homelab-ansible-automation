@@ -15,6 +15,10 @@
   ansible.builtin.include_tasks:
     file: ingress_traefik.yml
 
+- name: Deploy HashiCorp Vault
+  ansible.builtin.include_tasks:
+    file: vault.yml
+
 - name: Setup ArgoCD for GitOps Management
   ansible.builtin.include_tasks:
     file: argo_cd.yml

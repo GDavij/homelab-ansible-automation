@@ -6,7 +6,7 @@
     mode: '0755'
   become: true
   loop:
-    - /var/lib/longhorn
+    - /k8s_storage
     - /cold-storage/longhorn
 
 - name: Install Longhorn System
@@ -15,6 +15,19 @@
     state: present
     src: "https://raw.githubusercontent.com/longhorn/longhorn/v1.7.2/deploy/longhorn.yaml"
     kubeconfig: /etc/kubernetes/admin.conf
+
+- name: Disable Longhorn Default Disk Auto-Creation
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: /etc/kubernetes/admin.conf
+    definition:
+      apiVersion: longhorn.io/v1beta2
+      kind: Setting
+      metadata:
+        name: create-default-disk-labeled-nodes
+        namespace: longhorn-system
+      value: "true"
 
 - name: Copy Storage Manifests to Workstation
   ansible.builtin.copy:
@@ -56,19 +69,21 @@
       status: "True"
     wait_timeout: 60
 
-- name: Wait for Longhorn Admission Webhook to be Ready
+- name: Wait for Longhorn Manager to be Ready (includes admission webhook)
   become: true
   kubernetes.core.k8s_info:
     api_version: apps/v1
-    kind: Deployment
-    name: longhorn-admission-webhook
+    kind: DaemonSet
+    name: longhorn-manager
     namespace: longhorn-system
     kubeconfig: /etc/kubernetes/admin.conf
-    wait: true
-    wait_condition:
-      type: Available
-      status: "True"
-    wait_timeout: 180
+  register: kubernetes_storage_workstations_longhorn_manager
+  until:
+    - kubernetes_storage_workstations_longhorn_manager.resources | length > 0
+    - kubernetes_storage_workstations_longhorn_manager.resources[0].status.numberReady | default(0) > 0
+    - kubernetes_storage_workstations_longhorn_manager.resources[0].status.numberReady == kubernetes_storage_workstations_longhorn_manager.resources[0].status.desiredNumberScheduled
+  retries: 30
+  delay: 10
 
 - name: Apply Longhorn Node Manifest (SSD & HDD)
   become: true
@@ -76,3 +91,39 @@
     state: present
     src: /tmp/longhorn_node.k8s.yml
     kubeconfig: /etc/kubernetes/admin.conf
+
+- name: Remove Longhorn Auto-Created Default Disk (conflicts with custom disks)
+  become: true
+  ansible.builtin.shell: |
+    set -o pipefail
+    KUBECONFIG=/etc/kubernetes/admin.conf
+    export KUBECONFIG
+
+    DISK_KEYS=$(kubectl get nodes.longhorn.io monster-workstation \
+      -n longhorn-system -o json | python3 -c "
+    import sys, json
+    data = json.load(sys.stdin)
+    disks = data.get('spec', {}).get('disks', {})
+    for k in disks:
+        if k.startswith('default-disk'):
+            print(k)
+    ")
+
+    if [ -n "$DISK_KEYS" ]; then
+      for key in $DISK_KEYS; do
+        # Step 1: Disable scheduling and request eviction
+        kubectl patch nodes.longhorn.io monster-workstation \
+          -n longhorn-system --type=merge \
+          -p="{\"spec\":{\"disks\":{\"$key\":{\"allowScheduling\":false,\"evictionRequested\":true}}}}"
+        sleep 5
+        # Step 2: Remove the disk
+        kubectl patch nodes.longhorn.io monster-workstation \
+          -n longhorn-system --type=json \
+          -p="[{\"op\": \"remove\", \"path\": \"/spec/disks/$key\"}]"
+      done
+      echo "CHANGED: removed default disk(s)"
+    else
+      echo "OK: no default disks found"
+    fi
+  register: kubernetes_storage_workstations_default_disk_removal
+  changed_when: "'CHANGED' in kubernetes_storage_workstations_default_disk_removal.stdout"

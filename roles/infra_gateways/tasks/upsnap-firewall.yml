@@ -1,16 +1,4 @@
 ---
-# Upsnap Firewall Configuration
-# Configure firewall rules for Upsnap host network service
-# ALLOWS: Network -> Traefik -> Upsnap Proxy -> Upsnap
-# BLOCKS: Network -> Upsnap Proxy (direct), Network -> Upsnap (direct)
-
-# IMPORTANT: Rules are processed in order. Accept rules must come BEFORE reject rules.
-# Apply rules to: underlay_network (physical) and ztn_network (Tailscale)
-
-# ============================================================================
-# STEP 1: Remove existing Upsnap rules to ensure correct order
-# ============================================================================
-
 - name: Remove existing Upsnap rules from underlay_network zone
   ansible.posix.firewalld:
     zone: underlay_network
@@ -48,13 +36,6 @@
     - infra_gateways
     - upsnap
     - firewall
-
-# ============================================================================
-# STEP 2: Add rules in CORRECT order (ACCEPT before REJECT)
-# ============================================================================
-
-# UNDERLAY NETWORK ZONE (Physical Network Interface)
-# ============================================================================
 
 - name: Allow Traefik to access Upsnap proxy (8443) from Docker core network on underlay
   ansible.posix.firewalld:
@@ -111,10 +92,6 @@
     - infra_gateways
     - upsnap
     - firewall
-
-# ============================================================================
-# ZTN NETWORK ZONE (Tailscale Interface - tailscale0)
-# ============================================================================
 
 - name: Allow Traefik to access Upsnap proxy (8443) from Docker core network on ZTN
   ansible.posix.firewalld:
