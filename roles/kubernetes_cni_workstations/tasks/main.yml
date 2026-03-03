@@ -19,6 +19,10 @@
   ansible.builtin.include_tasks:
     file: vault.yml
 
+- name: Install External Secrets Operator
+  ansible.builtin.include_tasks:
+    file: external_secrets.yml
+
 - name: Setup ArgoCD for GitOps Management
   ansible.builtin.include_tasks:
     file: argo_cd.yml

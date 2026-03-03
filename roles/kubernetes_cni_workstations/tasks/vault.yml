@@ -100,6 +100,21 @@
   register: kubernetes_cni_workstations_vault_status
   failed_when: false
 
+- name: "Parse Vault Status"
+  ansible.builtin.set_fact:
+    kubernetes_cni_workstations_vault_initialized: >-
+      {{ (kubernetes_cni_workstations_vault_status.stdout | from_json).initialized | default(false) }}
+    kubernetes_cni_workstations_vault_sealed: >-
+      {{ (kubernetes_cni_workstations_vault_status.stdout | from_json).sealed | default(true) }}
+  when: kubernetes_cni_workstations_vault_status.stdout is defined
+
+- name: "Skip auto-unseal — Vault not yet initialized (run vault_bootstrap.playbook.yml)"
+  ansible.builtin.debug:
+    msg: >
+      Vault is not initialized. Skipping auto-unseal.
+      Run: ansible-playbook vault_bootstrap.playbook.yml
+  when: not (kubernetes_cni_workstations_vault_initialized | default(false) | bool)
+
 - name: "Auto-Unseal Vault (idempotent — skips if already unsealed)"
   become: true
   kubernetes.core.k8s_exec:
@@ -107,10 +122,27 @@
     pod: "{{ kubernetes_cni_workstations_vault_pods.resources[0].metadata.name }}"
     command: "vault operator unseal {{ vault_unseal_key }}"
     kubeconfig: /etc/kubernetes/admin.conf
+  register: kubernetes_cni_workstations_vault_unseal
   when:
-    - kubernetes_cni_workstations_vault_status.stdout is defined
-    - (kubernetes_cni_workstations_vault_status.stdout | from_json).sealed | default(true)
+    - kubernetes_cni_workstations_vault_initialized | default(false) | bool
+    - kubernetes_cni_workstations_vault_sealed | default(true) | bool
+  failed_when: false
   no_log: true
+
+- name: "Verify Vault is Unsealed"
+  become: true
+  kubernetes.core.k8s_exec:
+    namespace: security
+    pod: "{{ kubernetes_cni_workstations_vault_pods.resources[0].metadata.name }}"
+    command: vault status -format=json
+    kubeconfig: /etc/kubernetes/admin.conf
+  register: kubernetes_cni_workstations_vault_verify
+  failed_when: >-
+    kubernetes_cni_workstations_vault_verify.stdout is not defined or
+    (kubernetes_cni_workstations_vault_verify.stdout | from_json).sealed | default(true)
+  when:
+    - kubernetes_cni_workstations_vault_initialized | default(false) | bool
+    - kubernetes_cni_workstations_vault_unseal is not skipped
 
 - name: "Ensure External Secrets Namespace Exists"
   become: true
@@ -134,3 +166,4 @@
       type: Opaque
       stringData:
         token: "{{ vault_eso_token }}"
+  when: kubernetes_cni_workstations_vault_initialized | default(false) | bool

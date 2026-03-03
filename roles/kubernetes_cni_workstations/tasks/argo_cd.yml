@@ -20,6 +20,15 @@
   retries: 30
   delay: 5
 
+- name: "Create Namespaces for Ingress Services"
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    kind: Namespace
+    name: "{{ item }}"
+    kubeconfig: /etc/kubernetes/admin.conf
+  loop: "{{ k8s_ingress_services | map(attribute='namespace') | unique | list }}"
+
 - name: "Build ArgoCD IngressRoute Manifest"
   ansible.builtin.template:
     dest: "/tmp/argocd.k8s.yml"

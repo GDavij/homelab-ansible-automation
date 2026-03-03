@@ -37,22 +37,36 @@
         vault_admin_status.rc != 0 or
         (vault_admin_status.stdout | from_json).sealed
 
-    - name: "Login with Root Token"
+    - name: "Login to Vault"
       kubernetes.core.k8s_exec:
         namespace: security
         pod: "{{ vault_pod }}"
-        command: "vault login {{ vault_root_token }}"
+        command: "vault login -no-print {{ vault_root_token }}"
         kubeconfig: /etc/kubernetes/admin.conf
       no_log: true
 
-    - name: "Ensure Admin Policy Exists"
+    - name: "Write Admin Policy File"
       kubernetes.core.k8s_exec:
         namespace: security
         pod: "{{ vault_pod }}"
         command: >-
-          sh -c 'echo "path \"secret/*\" { capabilities = [\"create\", \"read\", \"update\", \"delete\", \"list\"] }
-          path \"sys/mounts\" { capabilities = [\"read\", \"list\"] }
-          path \"sys/mounts/*\" { capabilities = [\"read\"] }" | vault policy write admin-rw -'
+          sh -c 'printf "%s\n"
+          "path \"secret/*\" {"
+          "  capabilities = [\"create\", \"read\", \"update\", \"delete\", \"list\"]"
+          "}"
+          "path \"sys/mounts\" {"
+          "  capabilities = [\"read\", \"list\"]"
+          "}"
+          "path \"sys/mounts/*\" {"
+          "  capabilities = [\"read\"]"
+          "}" > /tmp/admin-rw.hcl'
+        kubeconfig: /etc/kubernetes/admin.conf
+
+    - name: "Create Admin Policy"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ vault_pod }}"
+        command: vault policy write admin-rw /tmp/admin-rw.hcl
         kubeconfig: /etc/kubernetes/admin.conf
 
     - name: "Generate Temporary Admin Token (12h TTL)"

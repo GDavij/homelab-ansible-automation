@@ -19,6 +19,25 @@ spec:
 {% endfor %}
 
 {% for svc in k8s_ingress_services %}
+{% if svc.tcp_passthrough | default(false) %}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: {{ svc.name }}
+  namespace: {{ svc.namespace }}
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: HostSNI(`{{ svc.name }}.svc.{{ cluster_domain }}`)
+      services:
+        - name: {{ svc.name }}
+          port: {{ svc.port }}
+  tls:
+    passthrough: true
+
+{% else %}
 {% if svc.insecure_backend | default(false) %}
 ---
 apiVersion: traefik.io/v1alpha1
@@ -41,10 +60,10 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`{{ svc.name }}.svc.{{ cluster_domain }}`)
+    - match: Host(`{{ svc.dns_override | default(svc.name) }}.svc.{{ cluster_domain }}`)
       kind: Rule
       services:
-        - name: {{ svc.name }}
+        - name: {{ svc.service_name | default(svc.name) }}
           port: {{ svc.port }}
 {% if svc.insecure_backend | default(false) %}
           serversTransport: {{ svc.name }}-transport
@@ -55,4 +74,5 @@ spec:
       name: mtls-strict
       namespace: {{ svc.namespace }}
 
+{% endif %}
 {% endfor %}

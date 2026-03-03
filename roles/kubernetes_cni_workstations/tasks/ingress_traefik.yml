@@ -19,6 +19,9 @@
     state: present
     src: /tmp/traefik_ingress.k8s.yml
     kubeconfig: /etc/kubernetes/admin.conf
+    server_side_apply:
+      field_manager: ansible
+      force_conflicts: true
 
 - name: "Wait for Traefik Deployment to be Ready"
   become: true

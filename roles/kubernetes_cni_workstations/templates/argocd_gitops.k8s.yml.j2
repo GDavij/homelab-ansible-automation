@@ -7,6 +7,8 @@ spec:
   description: "Homelab GitOps - All infrastructure not managed by Ansible"
   sourceRepos:
     - "{{ argocd_gitops_repo }}"
+    - "https://charts.external-secrets.io"
+    - "https://langfuse.github.io/langfuse-k8s"
   destinations:
     - namespace: "*"
       server: https://kubernetes.default.svc

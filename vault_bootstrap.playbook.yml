@@ -116,19 +116,19 @@
         kubeconfig: /etc/kubernetes/admin.conf
 
     # --- Step 4: Create ESO Policy ---
-    - name: "Create ESO Reader Policy"
+    - name: "Write ESO Policy File in Vault Pod"
       kubernetes.core.k8s_exec:
         namespace: security
         pod: "{{ vault_pod }}"
         command: >
-          sh -c 'vault policy write eso-reader - <<EOF
-          path "secret/data/*" {
-            capabilities = ["read"]
-          }
-          path "secret/metadata/*" {
-            capabilities = ["read", "list"]
-          }
-          EOF'
+          sh -c 'printf "path \"secret/data/*\" {\n  capabilities = [\"read\"]\n}\npath \"secret/metadata/*\" {\n  capabilities = [\"read\", \"list\"]\n}\n" > /tmp/eso-policy.hcl'
+        kubeconfig: /etc/kubernetes/admin.conf
+
+    - name: "Create ESO Reader Policy"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ vault_pod }}"
+        command: vault policy write eso-reader /tmp/eso-policy.hcl
         kubeconfig: /etc/kubernetes/admin.conf
 
     # --- Step 5: Generate Scoped ESO Token ---

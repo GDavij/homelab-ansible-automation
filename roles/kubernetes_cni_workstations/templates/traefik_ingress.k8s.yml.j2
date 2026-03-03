@@ -79,6 +79,8 @@ metadata:
     app: traefik
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: traefik
