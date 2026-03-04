@@ -37,3 +37,6 @@ id_ed25519
 
 # --- AI Tool Artifacts ---
 .serena/
+
+# --- Spec docs (contain secrets) ---
+*.spec.md

@@ -41,9 +41,6 @@ k8s_ingress_services:
   - name: langfuse
     namespace: observability
     port: 3000
-  - name: mlflow
-    namespace: observability
-    port: 5000
   - name: ollama
     namespace: ai-services
     port: 11434
@@ -53,6 +50,11 @@ k8s_ingress_services:
   - name: qdrant
     namespace: database
     port: 6333
+  - name: qdrant-api
+    namespace: database
+    port: 6333
+    service_name: qdrant
+    dns_override: "api-qdrant"
   - name: rabbitmq
     namespace: stack
     port: 15672
