@@ -1,0 +1,57 @@
+---
+- name: Write CoreDNS ConfigMap (original — no rewrite) to temp file
+  ansible.builtin.copy:
+    dest: /tmp/coredns-configmap.yml
+    mode: "0600"
+    content: |
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: coredns
+        namespace: kube-system
+      data:
+        Corefile: |
+          .:53 {
+              errors
+              health {
+                 lameduck 5s
+              }
+              ready
+              kubernetes k8s.monster.lab in-addr.arpa ip6.arpa {
+                 pods insecure
+                 fallthrough in-addr.arpa ip6.arpa
+                 ttl 30
+              }
+              prometheus :9153
+              forward . /etc/resolv.conf {
+                 max_concurrent 1000
+              }
+              cache 30 {
+                 disable success k8s.monster.lab
+                 disable denial k8s.monster.lab
+              }
+              loop
+              reload
+              loadbalance
+          }
+
+- name: Ensure CoreDNS ConfigMap is at baseline (no rewrite rules)
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/coredns-configmap.yml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: coredns_patch_result
+  changed_when: "'configured' in coredns_patch_result.stdout"
+
+# CoreDNS has the 'reload' plugin — it auto-picks up ConfigMap changes within ~30s.
+# No rollout restart needed; restarting pods before config propagates causes CrashLoopBackOff.
+- name: Wait for CoreDNS reload plugin to pick up new Corefile
+  ansible.builtin.pause:
+    seconds: 30
+  when: coredns_patch_result.changed
+
+- name: Remove CoreDNS ConfigMap temp file
+  ansible.builtin.file:
+    path: /tmp/coredns-configmap.yml
+    state: absent
+

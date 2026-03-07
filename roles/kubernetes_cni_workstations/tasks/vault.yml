@@ -144,6 +144,97 @@
     - kubernetes_cni_workstations_vault_initialized | default(false) | bool
     - kubernetes_cni_workstations_vault_unseal is not skipped
 
+- name: "Generate missing GitOps secret seed values (OpenSSL)"
+  ansible.builtin.set_fact:
+    vault_generated_postgres_password: "{{ lookup('pipe', 'openssl rand -hex 16') | trim }}"
+    vault_generated_coder_db_password: "{{ lookup('pipe', 'openssl rand -hex 16') | trim }}"
+    vault_generated_mlflow_db_password: "{{ lookup('pipe', 'openssl rand -hex 16') | trim }}"
+    vault_generated_langfuse_db_password: "{{ lookup('pipe', 'openssl rand -hex 16') | trim }}"
+    vault_generated_gitea_db_password: "{{ lookup('pipe', 'openssl rand -hex 16') | trim }}"
+    vault_generated_drone_db_password: "{{ lookup('pipe', 'openssl rand -hex 16') | trim }}"
+    vault_generated_minio_root_password: "{{ lookup('pipe', 'openssl rand -hex 16') | trim }}"
+    vault_generated_langfuse_nextauth_secret: "{{ lookup('pipe', 'openssl rand -base64 32') | trim }}"
+    vault_generated_langfuse_salt: "{{ lookup('pipe', 'openssl rand -hex 16') | trim }}"
+    vault_generated_langfuse_encryption_key: "{{ lookup('pipe', 'openssl rand -hex 32') | trim }}"
+    vault_generated_drone_rpc_secret: "{{ lookup('pipe', 'openssl rand -hex 32') | trim }}"
+    # NOTE: DRONE_GITEA_CLIENT_ID and DRONE_GITEA_CLIENT_SECRET are NOT auto-generated.
+    # They must be created manually in Gitea (Site Admin → Applications) and stored in Vault:
+    #   vault kv patch secret/ci-cd/drone DRONE_GITEA_CLIENT_ID="<from_gitea>" DRONE_GITEA_CLIENT_SECRET="<from_gitea>"
+    vault_generated_rabbitmq_password: "{{ lookup('pipe', 'openssl rand -hex 16') | trim }}"
+  when:
+    - kubernetes_cni_workstations_vault_secret_autogenerate | default(true) | bool
+    - kubernetes_cni_workstations_vault_initialized | default(false) | bool
+    - vault_root_token is defined
+  no_log: true
+
+- name: "Ensure Vault KV secrets exist for homelab-gitops workloads"
+  become: true
+  kubernetes.core.k8s_exec:
+    namespace: security
+    pod: "{{ kubernetes_cni_workstations_vault_pods.resources[0].metadata.name }}"
+    command: >-
+      sh -ec '
+      export VAULT_ADDR=http://127.0.0.1:8200;
+      export VAULT_TOKEN="{{ vault_root_token }}";
+      ensure_key() {
+        path="$1";
+        key="$2";
+        value="$3";
+        vault kv get -field="$key" "$path" >/dev/null 2>&1 && return 0;
+        vault kv get "$path" >/dev/null 2>&1 \
+          && vault kv patch "$path" "$key=$value" >/dev/null \
+          || vault kv put "$path" "$key=$value" >/dev/null;
+      };
+
+      ensure_key secret/database/postgres POSTGRES_PASSWORD "{{ vault_generated_postgres_password }}";
+      ensure_key secret/database/postgres CODER_DB_PASSWORD "{{ vault_generated_coder_db_password }}";
+      ensure_key secret/database/postgres MLFLOW_DB_PASSWORD "{{ vault_generated_mlflow_db_password }}";
+      ensure_key secret/database/postgres LANGFUSE_DB_PASSWORD "{{ vault_generated_langfuse_db_password }}";
+      ensure_key secret/database/postgres GITEA_DB_PASSWORD "{{ vault_generated_gitea_db_password }}";
+      ensure_key secret/database/postgres DRONE_DB_PASSWORD "{{ vault_generated_drone_db_password }}";
+
+      coder_pw="$(vault kv get -field=CODER_DB_PASSWORD secret/database/postgres)";
+      mlflow_pw="$(vault kv get -field=MLFLOW_DB_PASSWORD secret/database/postgres)";
+      langfuse_pw="$(vault kv get -field=LANGFUSE_DB_PASSWORD secret/database/postgres)";
+      drone_pw="$(vault kv get -field=DRONE_DB_PASSWORD secret/database/postgres)";
+
+      ensure_key secret/database/postgres CODER_DB_URL "postgres://coder:${coder_pw}@postgres.database.svc:5432/coder?sslmode=disable";
+      ensure_key secret/database/postgres MLFLOW_DB_URL "postgres://mlflow:${mlflow_pw}@postgres.database.svc:5432/mlflow?sslmode=disable";
+      ensure_key secret/database/postgres LANGFUSE_DB_URL "postgres://langfuse:${langfuse_pw}@postgres.database.svc:5432/langfuse?sslmode=disable";
+      ensure_key secret/database/postgres DRONE_DB_URL "postgres://drone:${drone_pw}@postgres.database.svc:5432/drone?sslmode=disable";
+
+      ensure_key secret/storage/minio MINIO_ROOT_USER "{{ kubernetes_cni_workstations_vault_minio_root_user }}";
+      ensure_key secret/storage/minio MINIO_ROOT_PASSWORD "{{ vault_generated_minio_root_password }}";
+
+      ensure_key secret/observability/langfuse NEXTAUTH_SECRET "{{ vault_generated_langfuse_nextauth_secret }}";
+      ensure_key secret/observability/langfuse SALT "{{ vault_generated_langfuse_salt }}";
+      ensure_key secret/observability/langfuse ENCRYPTION_KEY "{{ vault_generated_langfuse_encryption_key }}";
+
+      ensure_key secret/ci-cd/drone DRONE_RPC_SECRET "{{ vault_generated_drone_rpc_secret }}";
+      # DRONE_GITEA_CLIENT_ID and DRONE_GITEA_CLIENT_SECRET must be set manually from Gitea OAuth app
+
+      ensure_key secret/stack/rabbitmq RABBITMQ_DEFAULT_USER "{{ kubernetes_cni_workstations_vault_rabbitmq_default_user }}";
+      ensure_key secret/stack/rabbitmq RABBITMQ_DEFAULT_PASS "{{ vault_generated_rabbitmq_password }}";
+
+      ensure_key secret/ci-cd/coder CODER_PG_CONNECTION_URL "postgres://coder:${coder_pw}@postgres.database.svc:5432/coder?sslmode=disable";
+      '
+    kubeconfig: /etc/kubernetes/admin.conf
+  when:
+    - kubernetes_cni_workstations_vault_secret_autogenerate | default(true) | bool
+    - kubernetes_cni_workstations_vault_initialized | default(false) | bool
+    - vault_root_token is defined
+  no_log: true
+
+- name: "Warn when Vault root token is unavailable for auto secret bootstrap"
+  ansible.builtin.debug:
+    msg: >-
+      Vault is initialized but vault_root_token is not defined, skipping automatic secret bootstrap.
+      Ensure group_vars/Workstations/secrets.vault.yml includes vault_root_token.
+  when:
+    - kubernetes_cni_workstations_vault_secret_autogenerate | default(true) | bool
+    - kubernetes_cni_workstations_vault_initialized | default(false) | bool
+    - vault_root_token is not defined
+
 - name: "Ensure External Secrets Namespace Exists"
   become: true
   kubernetes.core.k8s:

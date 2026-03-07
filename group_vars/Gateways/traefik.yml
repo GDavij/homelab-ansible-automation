@@ -2,7 +2,6 @@
 http_routers:
   - name: adguard
     rule: "Host(`dns.lab`)"
-    entryPoints:
       - websecure
     mtls: true
     service:

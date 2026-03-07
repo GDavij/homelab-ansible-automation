@@ -39,4 +39,4 @@ id_ed25519
 .serena/
 
 # --- Spec docs (contain secrets) ---
-*.spec.md
+# *.spec.md

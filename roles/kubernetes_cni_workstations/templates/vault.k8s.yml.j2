@@ -20,10 +20,10 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: longhorn-ssd
+  storageClassName: {{ kubernetes_cni_workstations_vault_storage_class }}
   resources:
     requests:
-      storage: 2Gi
+      storage: {{ kubernetes_cni_workstations_vault_storage_size }}
 
 ---
 apiVersion: v1
@@ -93,7 +93,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: vault
-          image: hashicorp/vault:1.17
+          image: {{ kubernetes_cni_workstations_vault_image }}
           command: ["vault", "server", "-config=/vault/config/vault.hcl"]
           ports:
             - containerPort: 8200

@@ -15,6 +15,10 @@
   ansible.builtin.include_tasks:
     file: ingress_traefik.yml
 
+- name: Ensure CoreDNS ConfigMap is at baseline
+  ansible.builtin.include_tasks:
+    file: coredns.yml
+
 - name: Deploy HashiCorp Vault
   ansible.builtin.include_tasks:
     file: vault.yml

@@ -7,7 +7,7 @@
     permanent: true
     immediate: true
   become: true
-  loop: "{{ groups['Gateways'] }}"
+  loop: "{{ groups['Workstations'] }}"
   tags:
     - network_workstations
 

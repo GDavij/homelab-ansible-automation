@@ -1,0 +1,8 @@
+---
+kubernetes_cni_workstations_vault_image: "hashicorp/vault:1.17"
+kubernetes_cni_workstations_vault_storage_class: "longhorn-ssd"
+kubernetes_cni_workstations_vault_storage_size: "2Gi"
+
+kubernetes_cni_workstations_vault_secret_autogenerate: true
+kubernetes_cni_workstations_vault_minio_root_user: "Gatekeeper"
+kubernetes_cni_workstations_vault_rabbitmq_default_user: "GateKeeper"
