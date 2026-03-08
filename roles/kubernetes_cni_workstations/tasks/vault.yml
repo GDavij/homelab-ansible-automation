@@ -36,21 +36,202 @@
   retries: 30
   delay: 5
 
-- name: "Build Vault Manifest"
+ - name: "Build Transit Vault Manifest"
+  ansible.builtin.template:
+    dest: "/tmp/vault-transit.k8s.yml"
+    src: "vault-transit.k8s.yml.j2"
+    mode: "0644"
+  become: true
+
+- name: "Apply Transit Vault Manifest"
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    src: /tmp/vault-transit.k8s.yml
+    kubeconfig: /etc/kubernetes/admin.conf
+
+- name: "Wait for Transit Vault PVC to be Bound"
+  become: true
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: PersistentVolumeClaim
+    name: vault-transit-data
+    namespace: security
+    kubeconfig: /etc/kubernetes/admin.conf
+  register: kubernetes_cni_workstations_vault_transit_pvc
+  until:
+    - kubernetes_cni_workstations_vault_transit_pvc.resources | length > 0
+    - kubernetes_cni_workstations_vault_transit_pvc.resources[0].status.phase == "Bound"
+  retries: 30
+  delay: 10
+
+- name: "Wait for Transit Vault to be Ready"
+  become: true
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: vault-transit
+    namespace: security
+    kubeconfig: /etc/kubernetes/admin.conf
+    wait: true
+    wait_condition:
+      type: Available
+      status: "True"
+    wait_timeout: 300
+
+- name: "Get Transit Vault Pod Name"
+  become: true
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: security
+    label_selectors:
+      - app=vault-transit
+    kubeconfig: /etc/kubernetes/admin.conf
+  register: kubernetes_cni_workstations_vault_transit_pods
+
+- name: "Check Transit Vault Initialization Status"
+  become: true
+  kubernetes.core.k8s_exec:
+    namespace: security
+    pod: "{{ kubernetes_cni_workstations_vault_transit_pods.resources[0].metadata.name }}"
+    container: vault
+    command: vault status -format=json
+    kubeconfig: /etc/kubernetes/admin.conf
+  register: kubernetes_cni_workstations_vault_transit_status
+  failed_when: false
+
+- name: "Parse Transit Vault Status"
+  ansible.builtin.set_fact:
+    vault_transit_initialized: >-
+      {{ (kubernetes_cni_workstations_vault_transit_status.stdout | from_json).initialized | default(false) }}
+  when: kubernetes_cni_workstations_vault_transit_status.stdout is defined
+
+- name: "Initialize Transit Vault (if not initialized)"
+  become: true
+  kubernetes.core.k8s_exec:
+    namespace: security
+    pod: "{{ kubernetes_cni_workstations_vault_transit_pods.resources[0].metadata.name }}"
+    container: vault
+    command: vault operator init -key-shares=1 -key-threshold=1 -format=json
+    kubeconfig: /etc/kubernetes/admin.conf
+  register: vault_transit_init
+  when: not (vault_transit_initialized | default(false) | bool)
+  no_log: true
+
+- name: "Parse Transit Init Data"
+  ansible.builtin.set_fact:
+    vault_transit_new_unseal_key: "{{ (vault_transit_init.stdout | from_json).unseal_keys_b64[0] }}"
+    vault_transit_new_root_token: "{{ (vault_transit_init.stdout | from_json).root_token }}"
+  when: not (vault_transit_initialized | default(false) | bool)
+  no_log: true
+
+- name: "Unseal Transit Vault (Initial Unseal)"
+  become: true
+  kubernetes.core.k8s_exec:
+    namespace: security
+    pod: "{{ kubernetes_cni_workstations_vault_transit_pods.resources[0].metadata.name }}"
+    container: vault
+    command: "vault operator unseal {{ vault_transit_new_unseal_key }}"
+    kubeconfig: /etc/kubernetes/admin.conf
+  when: not (vault_transit_initialized | default(false) | bool)
+  no_log: true
+
+- name: "Configure Transit Engine and Create Token"
+  become: true
+  kubernetes.core.k8s_exec:
+    namespace: security
+    pod: "{{ kubernetes_cni_workstations_vault_transit_pods.resources[0].metadata.name }}"
+    container: vault
+    command: >
+      sh -c '
+      vault login {{ vault_transit_new_root_token }} >/dev/null &&
+      vault secrets enable transit >/dev/null 2>&1 || true &&
+      vault write -f transit/keys/autounseal >/dev/null &&
+      printf "path \"transit/encrypt/autounseal\" {\n  capabilities = [ \"update\" ]\n}\npath \"transit/decrypt/autounseal\" {\n  capabilities = [ \"update\" ]\n}\n" > /tmp/transit-policy.hcl &&
+      vault policy write autounseal /tmp/transit-policy.hcl >/dev/null &&
+      vault token create -orphan -policy="autounseal" -wrap-ttl=0 -period=768h -format=json
+      '
+    kubeconfig: /etc/kubernetes/admin.conf
+  register: vault_transit_token_req
+  when: not (vault_transit_initialized | default(false) | bool)
+  no_log: true
+
+- name: "Extract autounseal token"
+  ansible.builtin.set_fact:
+    vault_transit_new_token: "{{ (vault_transit_token_req.stdout | from_json).auth.client_token }}"
+  when: not (vault_transit_initialized | default(false) | bool)
+  no_log: true
+
+- name: "Save Transit Credentials to group_vars (Local)"
+  ansible.builtin.copy:
+    dest: "{{ playbook_dir }}/group_vars/Workstations/secrets.vault.yml"
+    mode: "0600"
+    content: |
+      ---
+      vault_transit_unseal_key: "{{ vault_transit_new_unseal_key }}"
+      vault_transit_root_token: "{{ vault_transit_new_root_token }}"
+      vault_transit_token: "{{ vault_transit_new_token }}"
+  delegate_to: localhost
+  become: false
+  when: not (vault_transit_initialized | default(false) | bool)
+
+- name: "Encrypt Transit Credentials"
+  ansible.builtin.command:
+    cmd: ansible-vault encrypt "{{ playbook_dir }}/group_vars/Workstations/secrets.vault.yml"
+  delegate_to: localhost
+  become: false
+  when: not (vault_transit_initialized | default(false) | bool)
+
+- name: "Deploy Transit Unseal Secret to Cluster"
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: /etc/kubernetes/admin.conf
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: vault-transit-unseal-key
+        namespace: security
+      type: Opaque
+      stringData:
+        vault_transit_unseal_key: "{{ vault_transit_new_unseal_key | default(vault_transit_unseal_key) | default('') }}"
+  when: vault_transit_new_unseal_key is defined or vault_transit_unseal_key is defined
+  no_log: true
+
+- name: "Deploy Transit Token Secret for Main Vault"
+  become: true
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: /etc/kubernetes/admin.conf
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: vault-transit-token
+        namespace: security
+      type: Opaque
+      stringData:
+        vault_transit_token: "{{ vault_transit_new_token | default(vault_transit_token) | default('') }}"
+  when: vault_transit_new_token is defined or vault_transit_token is defined
+  no_log: true
+
+ - name: "Build Main Vault Manifest"
   ansible.builtin.template:
     dest: "/tmp/vault.k8s.yml"
     src: "vault.k8s.yml.j2"
-    mode: '0644'
+    mode: "0644"
   become: true
 
-- name: "Apply Vault Manifest"
+- name: "Apply Main Vault Manifest"
   become: true
   kubernetes.core.k8s:
     state: present
     src: /tmp/vault.k8s.yml
     kubeconfig: /etc/kubernetes/admin.conf
 
-- name: "Wait for Vault PVC to be Bound"
+- name: "Wait for Main Vault PVC to be Bound"
   become: true
   kubernetes.core.k8s_info:
     api_version: v1
@@ -65,7 +246,7 @@
   retries: 30
   delay: 10
 
-- name: "Wait for Vault to be Ready"
+ - name: "Wait for Main Vault to be Ready"
   become: true
   kubernetes.core.k8s_info:
     api_version: apps/v1
@@ -79,7 +260,7 @@
       status: "True"
     wait_timeout: 300
 
-- name: "Get Vault Pod Name"
+- name: "Get Main Vault Pod Name"
   become: true
   kubernetes.core.k8s_info:
     api_version: v1
@@ -90,7 +271,7 @@
     kubeconfig: /etc/kubernetes/admin.conf
   register: kubernetes_cni_workstations_vault_pods
 
-- name: "Check Vault Seal Status"
+- name: "Check Main Vault Status"
   become: true
   kubernetes.core.k8s_exec:
     namespace: security
@@ -100,7 +281,7 @@
   register: kubernetes_cni_workstations_vault_status
   failed_when: false
 
-- name: "Parse Vault Status"
+- name: "Parse Main Vault Status"
   ansible.builtin.set_fact:
     kubernetes_cni_workstations_vault_initialized: >-
       {{ (kubernetes_cni_workstations_vault_status.stdout | from_json).initialized | default(false) }}
@@ -108,43 +289,14 @@
       {{ (kubernetes_cni_workstations_vault_status.stdout | from_json).sealed | default(true) }}
   when: kubernetes_cni_workstations_vault_status.stdout is defined
 
-- name: "Skip auto-unseal — Vault not yet initialized (run vault_bootstrap.playbook.yml)"
+- name: "Skip secret bootstrapping — Vault not initialized"
   ansible.builtin.debug:
     msg: >
-      Vault is not initialized. Skipping auto-unseal.
+      Main Vault is not initialized.
       Run: ansible-playbook vault_bootstrap.playbook.yml
   when: not (kubernetes_cni_workstations_vault_initialized | default(false) | bool)
 
-- name: "Auto-Unseal Vault (idempotent — skips if already unsealed)"
-  become: true
-  kubernetes.core.k8s_exec:
-    namespace: security
-    pod: "{{ kubernetes_cni_workstations_vault_pods.resources[0].metadata.name }}"
-    command: "vault operator unseal {{ vault_unseal_key }}"
-    kubeconfig: /etc/kubernetes/admin.conf
-  register: kubernetes_cni_workstations_vault_unseal
-  when:
-    - kubernetes_cni_workstations_vault_initialized | default(false) | bool
-    - kubernetes_cni_workstations_vault_sealed | default(true) | bool
-  failed_when: false
-  no_log: true
-
-- name: "Verify Vault is Unsealed"
-  become: true
-  kubernetes.core.k8s_exec:
-    namespace: security
-    pod: "{{ kubernetes_cni_workstations_vault_pods.resources[0].metadata.name }}"
-    command: vault status -format=json
-    kubeconfig: /etc/kubernetes/admin.conf
-  register: kubernetes_cni_workstations_vault_verify
-  failed_when: >-
-    kubernetes_cni_workstations_vault_verify.stdout is not defined or
-    (kubernetes_cni_workstations_vault_verify.stdout | from_json).sealed | default(true)
-  when:
-    - kubernetes_cni_workstations_vault_initialized | default(false) | bool
-    - kubernetes_cni_workstations_vault_unseal is not skipped
-
-- name: "Generate missing GitOps secret seed values (OpenSSL)"
+ - name: "Generate missing GitOps secret seed values (OpenSSL)"
   ansible.builtin.set_fact:
     vault_generated_postgres_password: "{{ lookup('pipe', 'openssl rand -hex 16') | trim }}"
     vault_generated_coder_db_password: "{{ lookup('pipe', 'openssl rand -hex 16') | trim }}"
@@ -157,9 +309,8 @@
     vault_generated_langfuse_salt: "{{ lookup('pipe', 'openssl rand -hex 16') | trim }}"
     vault_generated_langfuse_encryption_key: "{{ lookup('pipe', 'openssl rand -hex 32') | trim }}"
     vault_generated_drone_rpc_secret: "{{ lookup('pipe', 'openssl rand -hex 32') | trim }}"
-    # NOTE: DRONE_GITEA_CLIENT_ID and DRONE_GITEA_CLIENT_SECRET are NOT auto-generated.
-    # They must be created manually in Gitea (Site Admin → Applications) and stored in Vault:
-    #   vault kv patch secret/ci-cd/drone DRONE_GITEA_CLIENT_ID="<from_gitea>" DRONE_GITEA_CLIENT_SECRET="<from_gitea>"
+    vault_generated_drone_gitea_client_id: " "
+    vault_generated_drone_gitea_client_secret: " "
     vault_generated_rabbitmq_password: "{{ lookup('pipe', 'openssl rand -hex 16') | trim }}"
   when:
     - kubernetes_cni_workstations_vault_secret_autogenerate | default(true) | bool
@@ -169,67 +320,112 @@
 
 - name: "Ensure Vault KV secrets exist for homelab-gitops workloads"
   become: true
-  kubernetes.core.k8s_exec:
-    namespace: security
-    pod: "{{ kubernetes_cni_workstations_vault_pods.resources[0].metadata.name }}"
-    command: >-
-      sh -ec '
-      export VAULT_ADDR=http://127.0.0.1:8200;
-      export VAULT_TOKEN="{{ vault_root_token }}";
-      ensure_key() {
-        path="$1";
-        key="$2";
-        value="$3";
-        vault kv get -field="$key" "$path" >/dev/null 2>&1 && return 0;
-        vault kv get "$path" >/dev/null 2>&1 \
-          && vault kv patch "$path" "$key=$value" >/dev/null \
-          || vault kv put "$path" "$key=$value" >/dev/null;
-      };
+  block:
+    - name: "Write Admin Policy File in Vault Pod"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ kubernetes_cni_workstations_vault_pods.resources[0].metadata.name }}"
+        command: >-
+          sh -c 'printf "path \"secret/*\" {\n  capabilities = [\"create\", \"read\", \"update\", \"delete\", \"list\"]\n}\npath \"sys/mounts\" {\n  capabilities = [\"read\", \"list\"]\n}\npath \"sys/mounts/*\" {\n  capabilities = [\"read\"]\n}\n" > /tmp/admin-rw.hcl'
+        kubeconfig: /etc/kubernetes/admin.conf
 
-      ensure_key secret/database/postgres POSTGRES_PASSWORD "{{ vault_generated_postgres_password }}";
-      ensure_key secret/database/postgres CODER_DB_PASSWORD "{{ vault_generated_coder_db_password }}";
-      ensure_key secret/database/postgres MLFLOW_DB_PASSWORD "{{ vault_generated_mlflow_db_password }}";
-      ensure_key secret/database/postgres LANGFUSE_DB_PASSWORD "{{ vault_generated_langfuse_db_password }}";
-      ensure_key secret/database/postgres GITEA_DB_PASSWORD "{{ vault_generated_gitea_db_password }}";
-      ensure_key secret/database/postgres DRONE_DB_PASSWORD "{{ vault_generated_drone_db_password }}";
+    - name: "Create Admin Policy"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ kubernetes_cni_workstations_vault_pods.resources[0].metadata.name }}"
+        command: sh -c 'VAULT_TOKEN={{ vault_root_token }} vault policy write admin-rw /tmp/admin-rw.hcl'
+        kubeconfig: /etc/kubernetes/admin.conf
+      no_log: true
 
-      coder_pw="$(vault kv get -field=CODER_DB_PASSWORD secret/database/postgres)";
-      mlflow_pw="$(vault kv get -field=MLFLOW_DB_PASSWORD secret/database/postgres)";
-      langfuse_pw="$(vault kv get -field=LANGFUSE_DB_PASSWORD secret/database/postgres)";
-      drone_pw="$(vault kv get -field=DRONE_DB_PASSWORD secret/database/postgres)";
+    - name: "Generate Temporary Admin Token (12h TTL)"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ kubernetes_cni_workstations_vault_pods.resources[0].metadata.name }}"
+        command: sh -c 'VAULT_TOKEN={{ vault_root_token }} vault token create -policy=admin-rw -ttl=12h -format=json'
+        kubeconfig: /etc/kubernetes/admin.conf
+      register: kubernetes_cni_workstations_vault_temp_token
+      no_log: true
 
-      ensure_key secret/database/postgres CODER_DB_URL "postgres://coder:${coder_pw}@postgres.database.svc:5432/coder?sslmode=disable";
-      ensure_key secret/database/postgres MLFLOW_DB_URL "postgres://mlflow:${mlflow_pw}@postgres.database.svc:5432/mlflow?sslmode=disable";
-      ensure_key secret/database/postgres LANGFUSE_DB_URL "postgres://langfuse:${langfuse_pw}@postgres.database.svc:5432/langfuse?sslmode=disable";
-      ensure_key secret/database/postgres DRONE_DB_URL "postgres://drone:${drone_pw}@postgres.database.svc:5432/drone?sslmode=disable";
+    - name: "Set temporary admin token fact"
+      ansible.builtin.set_fact:
+        kubernetes_cni_workstations_vault_temp_token: "{{ (kubernetes_cni_workstations_vault_temp_token.stdout | from_json).auth.client_token }}"
 
-      ensure_key secret/storage/minio MINIO_ROOT_USER "{{ kubernetes_cni_workstations_vault_minio_root_user }}";
-      ensure_key secret/storage/minio MINIO_ROOT_PASSWORD "{{ vault_generated_minio_root_password }}";
+    - name: "Perform idempotent KV writes using temporary admin token"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ kubernetes_cni_workstations_vault_pods.resources[0].metadata.name }}"
+        command: >-
+          sh -ec '
+          export VAULT_ADDR=http://127.0.0.1:8200;
+          export VAULT_TOKEN="{{ kubernetes_cni_workstations_vault_temp_token }}";
+          ensure_key() {
+            path="$1";
+            key="$2";
+            value="$3";
+            current_value=$(vault kv get -field="$key" "$path" 2>/dev/null) || true;
+            if [ -n "$current_value" ]; then
+              return 0;
+            fi
+            if vault kv get "$path" >/dev/null 2>&1; then
+              vault kv patch "$path" "$key=$value" >/dev/null;
+            else
+              vault kv put "$path" "$key=$value" >/dev/null;
+            fi
+          };
 
-      ensure_key secret/observability/langfuse NEXTAUTH_SECRET "{{ vault_generated_langfuse_nextauth_secret }}";
-      ensure_key secret/observability/langfuse SALT "{{ vault_generated_langfuse_salt }}";
-      ensure_key secret/observability/langfuse ENCRYPTION_KEY "{{ vault_generated_langfuse_encryption_key }}";
+          ensure_key secret/database/postgres POSTGRES_PASSWORD "{{ vault_generated_postgres_password }}";
+          ensure_key secret/database/postgres CODER_DB_PASSWORD "{{ vault_generated_coder_db_password }}";
+          ensure_key secret/database/postgres MLFLOW_DB_PASSWORD "{{ vault_generated_mlflow_db_password }}";
+          ensure_key secret/database/postgres LANGFUSE_DB_PASSWORD "{{ vault_generated_langfuse_db_password }}";
+          ensure_key secret/database/postgres GITEA_DB_PASSWORD "{{ vault_generated_gitea_db_password }}";
+          ensure_key secret/database/postgres DRONE_DB_PASSWORD "{{ vault_generated_drone_db_password }}";
 
-      ensure_key secret/ci-cd/drone DRONE_RPC_SECRET "{{ vault_generated_drone_rpc_secret }}";
-      # DRONE_GITEA_CLIENT_ID and DRONE_GITEA_CLIENT_SECRET must be set manually from Gitea OAuth app
+          coder_pw="$(vault kv get -field=CODER_DB_PASSWORD secret/database/postgres 2>/dev/null)" || true;
+          mlflow_pw="$(vault kv get -field=MLFLOW_DB_PASSWORD secret/database/postgres 2>/dev/null)" || true;
+          langfuse_pw="$(vault kv get -field=LANGFUSE_DB_PASSWORD secret/database/postgres 2>/dev/null)" || true;
+          drone_pw="$(vault kv get -field=DRONE_DB_PASSWORD secret/database/postgres 2>/dev/null)" || true;
 
-      ensure_key secret/stack/rabbitmq RABBITMQ_DEFAULT_USER "{{ kubernetes_cni_workstations_vault_rabbitmq_default_user }}";
-      ensure_key secret/stack/rabbitmq RABBITMQ_DEFAULT_PASS "{{ vault_generated_rabbitmq_password }}";
+          ensure_key secret/database/postgres CODER_DB_URL "postgres://coder:${coder_pw}@postgres.database.svc:5432/coder?sslmode=disable";
+          ensure_key secret/database/postgres MLFLOW_DB_URL "postgres://mlflow:${mlflow_pw}@postgres.database.svc:5432/mlflow?sslmode=disable";
+          ensure_key secret/database/postgres LANGFUSE_DB_URL "postgres://langfuse:${langfuse_pw}@postgres.database.svc:5432/langfuse?sslmode=disable";
+          ensure_key secret/database/postgres DRONE_DB_URL "postgres://drone:${drone_pw}@postgres.database.svc:5432/drone?sslmode=disable";
 
-      ensure_key secret/ci-cd/coder CODER_PG_CONNECTION_URL "postgres://coder:${coder_pw}@postgres.database.svc:5432/coder?sslmode=disable";
-      '
-    kubeconfig: /etc/kubernetes/admin.conf
+          ensure_key secret/storage/minio MINIO_ROOT_USER "{{ kubernetes_cni_workstations_vault_minio_root_user }}";
+          ensure_key secret/storage/minio MINIO_ROOT_PASSWORD "{{ vault_generated_minio_root_password }}";
+
+          ensure_key secret/observability/langfuse NEXTAUTH_SECRET "{{ vault_generated_langfuse_nextauth_secret }}";
+          ensure_key secret/observability/langfuse SALT "{{ vault_generated_langfuse_salt }}";
+          ensure_key secret/observability/langfuse ENCRYPTION_KEY "{{ vault_generated_langfuse_encryption_key }}";
+
+          ensure_key secret/ci-cd/drone DRONE_RPC_SECRET "{{ vault_generated_drone_rpc_secret }}";
+          ensure_key secret/ci-cd/drone DRONE_GITEA_CLIENT_ID "{{ vault_generated_drone_gitea_client_id }}";
+          ensure_key secret/ci-cd/drone DRONE_GITEA_CLIENT_SECRET "{{ vault_generated_drone_gitea_client_secret }}";
+
+          ensure_key secret/stack/rabbitmq RABBITMQ_DEFAULT_USER "{{ kubernetes_cni_workstations_vault_rabbitmq_default_user }}";
+          ensure_key secret/stack/rabbitmq RABBITMQ_DEFAULT_PASS "{{ vault_generated_rabbitmq_password }}";
+
+          ensure_key secret/ci-cd/coder CODER_PG_CONNECTION_URL "postgres://coder:${coder_pw}@postgres.database.svc:5432/coder?sslmode=disable";
+          '
+        kubeconfig: /etc/kubernetes/admin.conf
+      no_log: true
+
+    - name: "Revoke Temporary Admin Token"
+      kubernetes.core.k8s_exec:
+        namespace: security
+        pod: "{{ kubernetes_cni_workstations_vault_pods.resources[0].metadata.name }}"
+        command: sh -c 'VAULT_TOKEN={{ vault_root_token }} vault token revoke {{ kubernetes_cni_workstations_vault_temp_token }} || true'
+        kubeconfig: /etc/kubernetes/admin.conf
+      no_log: true
+
   when:
     - kubernetes_cni_workstations_vault_secret_autogenerate | default(true) | bool
     - kubernetes_cni_workstations_vault_initialized | default(false) | bool
     - vault_root_token is defined
-  no_log: true
 
-- name: "Warn when Vault root token is unavailable for auto secret bootstrap"
+- name: "Warn when Vault root token is unavailable"
   ansible.builtin.debug:
     msg: >-
       Vault is initialized but vault_root_token is not defined, skipping automatic secret bootstrap.
-      Ensure group_vars/Workstations/secrets.vault.yml includes vault_root_token.
   when:
     - kubernetes_cni_workstations_vault_secret_autogenerate | default(true) | bool
     - kubernetes_cni_workstations_vault_initialized | default(false) | bool
@@ -257,4 +453,6 @@
       type: Opaque
       stringData:
         token: "{{ vault_eso_token }}"
-  when: kubernetes_cni_workstations_vault_initialized | default(false) | bool
+  when:
+    - kubernetes_cni_workstations_vault_initialized | default(false) | bool
+    - vault_eso_token is defined

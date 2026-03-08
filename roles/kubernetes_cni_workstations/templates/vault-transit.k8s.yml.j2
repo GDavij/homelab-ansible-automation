@@ -1,47 +1,26 @@
 ---
 apiVersion: v1
-kind: Namespace
-metadata:
-  name: security
-  annotations:
-    argocd.argoproj.io/sync-wave: "0"
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: vault
-  namespace: security
-  annotations:
-    argocd.argoproj.io/sync-wave: "0"
-
----
-apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: vault-data
+  name: vault-transit-data
   namespace: security
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
 spec:
   accessModes:
     - ReadWriteOnce
   storageClassName: {{ kubernetes_cni_workstations_vault_storage_class }}
   resources:
     requests:
-      storage: {{ kubernetes_cni_workstations_vault_storage_size }}
+      storage: 1Gi
 
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: vault-config
+  name: vault-transit-config
   namespace: security
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
 data:
   vault.hcl: |
-    ui = true
+    ui = false
     disable_mlock = true
 
     listener "tcp" {
@@ -49,62 +28,49 @@ data:
       tls_disable = true
     }
 
-    storage "raft" {
-      path    = "/vault/data"
-      node_id = "vault-0"
+    storage "file" {
+      path = "/vault/data"
     }
 
-    seal "transit" {
-      address = "http://vault-transit.security.svc.{{ cluster_domain }}:8200"
-      disable_renewal = "false"
-      key_name = "autounseal"
-      mount_path = "transit/"
-      tls_skip_verify = "true"
-    }
-
-    api_addr     = "http://vault.security.svc.{{ cluster_domain }}:8200"
-    cluster_addr = "http://vault.security.svc.{{ cluster_domain }}:8201"
+    api_addr = "http://vault-transit.security.svc.{{ cluster_domain }}:8200"
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: vault
+  name: vault-transit
   namespace: security
   annotations:
-    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   selector:
-    app: vault
+    app: vault-transit
   ports:
     - port: 8200
       targetPort: 8200
       name: http
-    - port: 8201
-      targetPort: 8201
-      name: cluster
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: vault
+  name: vault-transit
   namespace: security
   labels:
-    app: vault
+    app: vault-transit
   annotations:
-    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: vault
+      app: vault-transit
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: vault
+        app: vault-transit
     spec:
       serviceAccountName: vault
       securityContext:
@@ -118,21 +84,13 @@ spec:
           ports:
             - containerPort: 8200
               name: http
-            - containerPort: 8201
-              name: cluster
           env:
             - name: VAULT_ADDR
               value: "http://127.0.0.1:8200"
             - name: VAULT_API_ADDR
-              value: "http://vault.security.svc.{{ cluster_domain }}:8200"
+              value: "http://vault-transit.security.svc.{{ cluster_domain }}:8200"
             - name: SKIP_CHOWN
               value: "true"
-            - name: VAULT_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: vault-transit-token
-                  key: "vault_transit_token"
-                  optional: true
           volumeMounts:
             - name: data
               mountPath: /vault/data
@@ -143,8 +101,8 @@ spec:
               cpu: 50m
               memory: 64Mi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 200m
+              memory: 256Mi
           securityContext:
             capabilities:
               add: ["IPC_LOCK"]
@@ -160,10 +118,41 @@ spec:
               port: 8200
             initialDelaySeconds: 30
             periodSeconds: 15
+
+        - name: vault-unseal
+          image: curlimages/curl:latest
+          env:
+            - name: VAULT_UNSEAL_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vault-transit-unseal-key
+                  key: vault_transit_unseal_key
+                  optional: true
+          command:
+            - /bin/sh
+            - -c
+            - |
+              while true; do
+                echo "$(date) checking vault seal status..."
+                status=$(curl -s http://127.0.0.1:8200/v1/sys/seal-status)
+                if echo "$status" | grep -q '"sealed":true' && echo "$status" | grep -q '"initialized":true' ; then
+                  echo "$(date) vault is sealed. unsealing..."
+                  curl -s --request POST --data "{\"key\": \"${VAULT_UNSEAL_KEY}\"}" http://127.0.0.1:8200/v1/sys/unseal
+                fi
+                sleep 5
+              done
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi
+
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: vault-data
+            claimName: vault-transit-data
         - name: config
           configMap:
-            name: vault-config
+            name: vault-transit-config
