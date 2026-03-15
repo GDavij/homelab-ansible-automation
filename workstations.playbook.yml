@@ -48,14 +48,6 @@
         - nvidia_gpu
         - k8s
 
-    - name: Kubernetes Storage Workstation Setup
-      ansible.builtin.import_role:
-        name: kubernetes_storage_workstations
-      tags:
-        - kubernetes
-        - storage
-        - k8s
-
     - name: Kubernetes Autoscaling and Metrics Workstation Setup
       ansible.builtin.import_role:
         name: kubernetes_scaling_workstations

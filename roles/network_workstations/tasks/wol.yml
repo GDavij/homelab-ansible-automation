@@ -1,0 +1,33 @@
+---
+- name: Create Wake-on-LAN systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/wol.service
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Enable Wake-on-LAN on {{ ansible_default_ipv4.interface }}
+      After=network.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/sbin/ethtool -s {{ ansible_default_ipv4.interface }} wol g
+
+      [Install]
+      WantedBy=multi-user.target
+  become: true
+  tags:
+    - network_workstations
+    - wol
+
+- name: Enable and start Wake-on-LAN service
+  ansible.builtin.systemd:
+    name: wol
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+  tags:
+    - network_workstations
+    - wol

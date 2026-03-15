@@ -7,21 +7,19 @@
     name: security
     kubeconfig: /etc/kubernetes/admin.conf
 
-- name: "Wait for Longhorn CSI Plugin to be Ready"
+- name: "Create ServiceAccount for Vault"
   become: true
-  kubernetes.core.k8s_info:
-    api_version: apps/v1
-    kind: DaemonSet
-    name: longhorn-csi-plugin
-    namespace: longhorn-system
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: vault
+        namespace: security
     kubeconfig: /etc/kubernetes/admin.conf
-  register: kubernetes_cni_workstations_longhorn_csi
-  until:
-    - kubernetes_cni_workstations_longhorn_csi.resources | length > 0
-    - kubernetes_cni_workstations_longhorn_csi.resources[0].status.numberReady | default(0) > 0
-    - kubernetes_cni_workstations_longhorn_csi.resources[0].status.numberReady == kubernetes_cni_workstations_longhorn_csi.resources[0].status.desiredNumberScheduled
-  retries: 30
-  delay: 10
+
+
 
 - name: "Wait for Reflector to Replicate TLS Secret to Security Namespace"
   become: true
@@ -36,7 +34,7 @@
   retries: 30
   delay: 5
 
- - name: "Build Transit Vault Manifest"
+- name: "Build Transit Vault Manifest"
   ansible.builtin.template:
     dest: "/tmp/vault-transit.k8s.yml"
     src: "vault-transit.k8s.yml.j2"
@@ -49,21 +47,6 @@
     state: present
     src: /tmp/vault-transit.k8s.yml
     kubeconfig: /etc/kubernetes/admin.conf
-
-- name: "Wait for Transit Vault PVC to be Bound"
-  become: true
-  kubernetes.core.k8s_info:
-    api_version: v1
-    kind: PersistentVolumeClaim
-    name: vault-transit-data
-    namespace: security
-    kubeconfig: /etc/kubernetes/admin.conf
-  register: kubernetes_cni_workstations_vault_transit_pvc
-  until:
-    - kubernetes_cni_workstations_vault_transit_pvc.resources | length > 0
-    - kubernetes_cni_workstations_vault_transit_pvc.resources[0].status.phase == "Bound"
-  retries: 30
-  delay: 10
 
 - name: "Wait for Transit Vault to be Ready"
   become: true
@@ -217,7 +200,7 @@
   when: vault_transit_new_token is defined or vault_transit_token is defined
   no_log: true
 
- - name: "Build Main Vault Manifest"
+- name: "Build Main Vault Manifest"
   ansible.builtin.template:
     dest: "/tmp/vault.k8s.yml"
     src: "vault.k8s.yml.j2"
@@ -246,7 +229,7 @@
   retries: 30
   delay: 10
 
- - name: "Wait for Main Vault to be Ready"
+- name: "Wait for Main Vault to be Ready"
   become: true
   kubernetes.core.k8s_info:
     api_version: apps/v1
@@ -296,7 +279,7 @@
       Run: ansible-playbook vault_bootstrap.playbook.yml
   when: not (kubernetes_cni_workstations_vault_initialized | default(false) | bool)
 
- - name: "Generate missing GitOps secret seed values (OpenSSL)"
+- name: "Generate missing GitOps secret seed values (OpenSSL)"
   ansible.builtin.set_fact:
     vault_generated_postgres_password: "{{ lookup('pipe', 'openssl rand -hex 16') | trim }}"
     vault_generated_coder_db_password: "{{ lookup('pipe', 'openssl rand -hex 16') | trim }}"

@@ -17,19 +17,19 @@
                  lameduck 5s
               }
               ready
+              # Senior DevOps Fix: Map standard K8s lookups to custom domain
+              rewrite name suffix .cluster.local .k8s.monster.lab
               kubernetes k8s.monster.lab in-addr.arpa ip6.arpa {
                  pods insecure
                  fallthrough in-addr.arpa ip6.arpa
                  ttl 30
               }
               prometheus :9153
-              forward . /etc/resolv.conf {
+              # AdGuard Home handles monster.lab and upstream resolution
+              forward . {{ gateway_core_station_ip }} {
                  max_concurrent 1000
               }
-              cache 30 {
-                 disable success k8s.monster.lab
-                 disable denial k8s.monster.lab
-              }
+              cache 30
               loop
               reload
               loadbalance
@@ -54,4 +54,3 @@
   ansible.builtin.file:
     path: /tmp/coredns-configmap.yml
     state: absent
-

@@ -1,4 +1,5 @@
 version = 2
+disabled_plugins = []
 
 [plugins]
   # --- NOTE: using grpc.v1.cri instead of cri.v1.runtime ---

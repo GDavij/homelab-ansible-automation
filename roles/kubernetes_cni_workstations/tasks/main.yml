@@ -1,5 +1,32 @@
 ---
-- name: Setup Certificates for Kubernetes Ingress Traefik
+# =============================================================================
+# kubernetes_cni_workstations — main.yml
+# =============================================================================
+# RESPONSIBILITY: Bootstrap tasks that MUST run before ArgoCD can start.
+# ArgoCD is installed last so it can take over management of everything else.
+#
+# Removed tasks (moved to GitOps homelab-gitops-k8s-cluster):
+#   - ingress_traefik.yml  → ci_cd/traefik/main.yml
+#   - vault.yml            → security/hashi_vault/vault.yml + vault-transit.yml
+#   - external_secrets.yml → security/external_secrets_operator/application.yml
+#
+# Kept tasks (bootstrap boundary — must exist before ArgoCD):
+#   - certificates.yml   : TLS cert files written to /etc/kubernetes/pki/ by pki role
+#   - reflector.yml      : Must exist so shared TLS secrets replicate to argocd ns
+#   - shared_secrets.yml : Creates monster-server-cert + monster-ca-trust in kube-system
+#   - coredns.yml        : CoreDNS ConfigMap baseline (cluster DNS must work first)
+#   - argo_cd.yml        : ArgoCD install + ApplicationSet (final bootstrap step)
+# =============================================================================
+
+- name: Install Traefik CRD
+  ansible.builtin.include_tasks:
+    file: ingress_traefik.yml
+
+- name: Install External Secrets CRDs
+  ansible.builtin.include_tasks:
+    file: external_secrets.yml
+
+- name: Setup TLS Certificates for Kubernetes Ingress
   ansible.builtin.include_tasks:
     file: certificates.yml
 
@@ -7,25 +34,13 @@
   ansible.builtin.include_tasks:
     file: reflector.yml
 
-- name: Deploy Shared TLS Secrets (Reflector)
+- name: Deploy Shared TLS Secrets (monster-server-cert + monster-ca-trust)
   ansible.builtin.include_tasks:
     file: shared_secrets.yml
-
-- name: Setup Traefik Ingress Controller
-  ansible.builtin.include_tasks:
-    file: ingress_traefik.yml
 
 - name: Ensure CoreDNS ConfigMap is at baseline
   ansible.builtin.include_tasks:
     file: coredns.yml
-
-- name: Deploy HashiCorp Vault
-  ansible.builtin.include_tasks:
-    file: vault.yml
-
-- name: Install External Secrets Operator
-  ansible.builtin.include_tasks:
-    file: external_secrets.yml
 
 - name: Setup ArgoCD for GitOps Management
   ansible.builtin.include_tasks:

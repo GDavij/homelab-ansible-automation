@@ -22,3 +22,18 @@
       tags:
         - security
         - users
+
+
+- name: Deploy Upsnap SSH Key in Gateway Machine
+  hosts: Gateways
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Deploy Upsnap SSH Key
+      ansible.builtin.copy:
+        src: .ssh_keys/monster_automation/upsnap_id_ed25519
+        dest: /home/vanguard/.ssh/upsnap_id_ed25519
+        mode: '0600'
+      tags:
+        - security
+        - ssh_keys

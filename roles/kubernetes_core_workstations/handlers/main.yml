@@ -13,3 +13,8 @@
   become: true
   changed_when: true
   when: kubernetes_core_workstations_cilium_hubble_result.changed
+
+- name: Firewalld restart
+  ansible.builtin.service:
+    name: firewalld
+    state: reloaded

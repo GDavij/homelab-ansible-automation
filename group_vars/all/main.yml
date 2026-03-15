@@ -108,3 +108,10 @@ docker_proxy_net_gateway: "172.21.0.1"
 
 # Traefik version (shared between gateway Docker Compose and K8s ingress)
 traefik_version: "v3.6.6"
+
+# Kubernetes CIDRs
+# Standardized across all roles to ensure alignment between Cilium, Firewalld, and CNI tasks.
+k8s_pod_cidr: "10.0.0.0/16"
+k8s_service_cidr: "10.96.0.0/12"
+k8s_api_server_host: "{{ workstation_core_station_ip }}"
+k8s_api_server_port: 6443

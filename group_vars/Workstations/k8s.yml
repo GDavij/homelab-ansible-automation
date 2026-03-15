@@ -4,7 +4,6 @@ k8s_workstation_services:
     description: "Port for Traefik Ingress Controller HTTPS traffic"
     port: "443/tcp"
 
-
 # node_name is defined per-host in host_vars/<hostname>/identity.yml
 node_hostname: "{{ node_name }}-workstation"
 cluster_domain: "k8s.{{ node_name }}.lab"
@@ -20,7 +19,7 @@ k8s_ingress_services:
   - name: argocd-server
     namespace: argocd
     port: 443
-    tcp_passthrough: true  # ArgoCD uses its own TLS + gRPC, passthrough via HostSNI
+    tcp_passthrough: true # ArgoCD uses its own TLS + gRPC, passthrough via HostSNI
   - name: hubble-ui
     namespace: kube-system
     port: 80
@@ -64,8 +63,8 @@ k8s_ingress_services:
   - name: minio-api
     namespace: storage
     port: 9000
-    service_name: minio  # Routes to minio service, not minio-api
-    dns_override: "s3"   # s3.svc.k8s.monster.lab
+    service_name: minio # Routes to minio service, not minio-api
+    dns_override: "s3" # s3.svc.k8s.monster.lab
 
 # ArgoCD GitOps Configuration
 argocd_gitops_repo: "https://github.com/GDavij/homelab-gitops-k8s-cluster.git"

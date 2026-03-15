@@ -3,7 +3,7 @@
   ansible.builtin.get_url:
     url: https://download.docker.com/linux/fedora/docker-ce.repo
     dest: /etc/yum.repos.d/docker-ce.repo
-    mode: '0644'
+    mode: "0644"
   become: true
 
 - name: Update Cache after Docker Repo addiction
@@ -21,7 +21,7 @@
   ansible.builtin.file:
     path: /etc/containerd
     state: directory
-    mode: '0755'
+    mode: "0755"
   become: true
 
 - name: Enable and Start Containerd Service now
@@ -39,7 +39,7 @@
       image-endpoint: unix:///run/containerd/containerd.sock
       timeout: 10
       debug: false
-    mode: '0644'
+    mode: "0644"
   become: true
 
 - name: Overwrite config.toml (Base version 2.0)
@@ -48,10 +48,32 @@
     dest: /etc/containerd/config.toml
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
+  become: true
+  notify:
+    - Restart Containerd (Kubernetes Core)
+  tags:
+    - containerd
+
+- name: Ensure Systemd override directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/containerd.service.d
+    state: directory
+    mode: "0755"
   become: true
   tags:
     - containerd
+
+- name: Force Containerd to read my toml configuration
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/containerd.service.d/override.conf
+    content: |
+      [Service]
+      ExecStart=
+      ExecStart=/usr/bin/containerd --config /etc/containerd/config.toml
+    mode: "0644"
+  become: true
+  notify: Restart Containerd (Kubernetes Core)
 
 - name: Force Restart Containerd to Apply new configurations
   ansible.builtin.meta: flush_handlers

@@ -20,29 +20,6 @@
   retries: 30
   delay: 5
 
-- name: "Create Namespaces for Ingress Services"
-  become: true
-  kubernetes.core.k8s:
-    state: present
-    kind: Namespace
-    name: "{{ item }}"
-    kubeconfig: /etc/kubernetes/admin.conf
-  loop: "{{ k8s_ingress_services | map(attribute='namespace') | unique | list }}"
-
-- name: "Build ArgoCD IngressRoute Manifest"
-  ansible.builtin.template:
-    dest: "/tmp/argocd.k8s.yml"
-    src: "argocd.k8s.yml.j2"
-    mode: '0644'
-  become: true
-
-- name: "Apply ArgoCD IngressRoutes and mTLS Config"
-  become: true
-  kubernetes.core.k8s:
-    state: present
-    src: /tmp/argocd.k8s.yml
-    kubeconfig: /etc/kubernetes/admin.conf
-
 - name: "Install ArgoCD (Server-Side Apply)"
   become: true
   kubernetes.core.k8s:
@@ -71,7 +48,7 @@
   ansible.builtin.template:
     dest: "/tmp/argocd_gitops.k8s.yml"
     src: "argocd_gitops.k8s.yml.j2"
-    mode: '0644'
+    mode: "0644"
   become: true
 
 - name: "Apply ArgoCD GitOps (AppProject + Application)"

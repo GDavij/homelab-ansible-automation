@@ -20,10 +20,6 @@
   ansible.builtin.include_tasks:
     file: memory_optimization.yml
 
-- name: Optimize File System Storage
-  ansible.builtin.include_tasks:
-    file: fs_storage_optimization.yml
-
 - name: Upload Certificates for Cluster Access
   ansible.builtin.include_tasks:
     file: certificates.yml

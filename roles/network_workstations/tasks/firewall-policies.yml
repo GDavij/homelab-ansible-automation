@@ -4,7 +4,58 @@
     zone: underlay_network
     state: present
     permanent: true
-    target: DROP
+  become: true
+  notify:
+    - Reload Firewalld (Network Workstations)
+  tags:
+    - network_workstations
+
+- name: Flush Handlers to register Zone now
+  ansible.builtin.meta: flush_handlers
+  tags:
+    - network_workstations
+
+- name: Force DBus Sync
+  ansible.builtin.command: firewall-cmd --reload
+  become: true
+  changed_when: false
+  tags:
+    - network_workstations
+
+- name: Define INGRESS Policies
+  ansible.builtin.include_tasks:
+    file: firewall-ingress-policies.yml
+  tags:
+    - network_workstations
+
+- name: Enable Masquerading (NAT Gateway)
+  ansible.posix.firewalld:
+    zone: underlay_network
+    masquerade: true
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  tags:
+    - network_workstations
+
+- name: Bind Default Physical Network Interface into Underlay Zone(Security Group)
+  ansible.posix.firewalld:
+    zone: underlay_network
+    interface: "{{ ansible_default_ipv4.interface }}"
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  tags:
+    - network_workstations
+
+- name: Define Underlay Zone
+  ansible.posix.firewalld:
+    zone: underlay_network
+    state: present
+    permanent: true
+    target: ACCEPT
   become: true
   notify:
     - Reload Firewalld (Network Workstations)
@@ -22,15 +73,6 @@
 
 - name: Flush Handlers to register Zone now
   ansible.builtin.meta: flush_handlers
-
-- name: Bind Default Physical Network Interface into Underlay Zone(Security Group)
-  ansible.posix.firewalld:
-    zone: underlay_network
-    interface: "{{ ansible_default_ipv4.interface }}"
-    state: enabled
-    permanent: true
-    immediate: true
-  become: true
   tags:
     - network_workstations
 
@@ -41,26 +83,5 @@
     state: present
     autoconnect: true
   become: true
-
-- name: Enable Masquerading (NAT Gateway)
-  ansible.posix.firewalld:
-    zone: underlay_network
-    masquerade: true
-    state: enabled
-    permanent: true
-    immediate: true
-  become: true
-  tags:
-    - network_workstations
-
-- name: Define INGRESS Policies
-  ansible.builtin.include_tasks:
-    file: firewall-ingress-policies.yml
-  tags:
-    - network_workstations
-
-- name: Define EGRESS Policies
-  ansible.builtin.include_tasks:
-    file: firewall-egress-policies.yml
   tags:
     - network_workstations
