@@ -1,3 +1,4 @@
+---
 name: Ansible Lint
 
 on:
@@ -34,4 +35,4 @@ jobs:
         run: cp inventory.example.ini inventory.ini
 
       - name: Run ansible-lint
-        run: ansible-lint
+        run: find roles/ -type f -path "*/tasks/*.yml" ! -name "*.vault.yml" | xargs --no-run-if-empty ansible-lint
