@@ -15,17 +15,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install Ansible
-        run: pip install ansible-core
-
-      - name: Install Ansible Galaxy dependencies
-        run: ansible-galaxy install -r requirements.yml
-
       - name: Create dummy vault password file
         run: echo "ci-dummy-vault-pass" > ~/.ansible_vault_pass
 
