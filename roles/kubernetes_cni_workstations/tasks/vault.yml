@@ -19,8 +19,6 @@
         namespace: security
     kubeconfig: /etc/kubernetes/admin.conf
 
-
-
 - name: "Wait for Reflector to Replicate TLS Secret to Security Namespace"
   become: true
   kubernetes.core.k8s_info:

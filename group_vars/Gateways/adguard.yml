@@ -91,6 +91,11 @@ adguard_rewrites:
     description: Split-Horizon DNS - Kubernetes Ingress Wildcard via Gateway Traefik
     ip: "{{ gateway_core_station_ip }}"
 
+  - name: Bastion Gateway Proxy
+    dns: "*.lab"
+    description: Wildcard DNS for Bastion Host Access via Traefik TCP Routing
+    ip: "{{ gateway_core_station_ip }}"
+
 bastion_internal_hosts_dns:
   - name: Monster Workstation Machine
     dns: "k8s.monster.internal"
